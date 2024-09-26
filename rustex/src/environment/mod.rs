@@ -20,10 +20,10 @@ impl Env {
         }
     }
 
-    /// Fetch an environment variable, or return an error if not found
-    pub fn get(key: &str) -> Result<String, env::VarError> {
-        env::var(key)
-    }
+    // /// Fetch an environment variable, or return an error if not found
+    // pub fn get(key: &str) -> Result<String, env::VarError> {
+    //     env::var(key)
+    // }
 
     // /// Fetch an environment variable with a default value
     // pub fn get_or_default(key: &str, default: &str) -> String {
