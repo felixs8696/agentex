@@ -1,0 +1,71 @@
+services:
+  temporal:
+    container_name: temporal
+    environment:
+      - DB=sqlite
+      - NUM_HISTORY_SHARDS=3
+      - SKIP_SCHEMA_SETUP=true
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    image: temporalio/auto-setup:1.21.4
+    networks:
+      - temporal-network
+    ports:
+      - 7233:7233
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+      - ./temporal/config_template.yaml:/etc/temporal/config/config_template.yaml
+
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/admin-tools:1.21.4
+    networks:
+      - temporal-network
+    stdin_open: true
+    tty: true
+
+  temporal-ui:
+    container_name: temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    image: temporalio/ui:2.17.2
+    networks:
+      - temporal-network
+    ports:
+      - 8080:8080
+
+  redis:
+    container_name: redis
+    image: redis/redis-stack-server:7.2.0-v6
+    ports:
+      - 16379:6379
+
+  agentex-backend:
+    container_name: agentex-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ENV=development
+      - UVICORN_PORT=5003
+    ports:
+      - "5003:5003"
+    volumes:
+      - .:/app  # Mount your app directory
+    command: uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
+    depends_on:
+      - temporal
+      - redis
+    networks:
+      - temporal-network
+
+networks:
+  temporal-network:
+    driver: bridge
+    name: temporal-network

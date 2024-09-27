@@ -8,3 +8,11 @@ Cargo.lock
 .DS_Store
 
 .env**
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz

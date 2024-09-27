@@ -3,9 +3,17 @@
 install:
 	poetry install
 
-# Command to run in development mode
+# Command to run everything in development mode using Docker Compose
 dev:
-	ENV=development UVICORN_PORT=5003 uvicorn agentex.api.app:app --reload
+	docker-compose up --build
+
+# Command to stop and remove all services
+stop:
+	docker-compose down
+
+# Command to clean up services, removing containers, networks, and volumes
+clean:
+	docker-compose down --volumes --remove-orphans
 
 # Command to run in production mode
 prod:
@@ -13,4 +21,4 @@ prod:
 
 # Command to test (just an example)
 test:
-	cargo test
+	pytest tests/
