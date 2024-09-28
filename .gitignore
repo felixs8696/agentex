@@ -16,3 +16,4 @@ __pycache__/
 *.pyw
 *.pyz
 *.pywz
+.coverage

@@ -9,11 +9,11 @@ class LLMGateway(ABC):
 
     @abstractmethod
     def completion(self, *args, **kwargs) -> Message:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def acompletion(self, *args, **kwargs) -> Message:
-        pass
+        raise NotImplementedError
 
 
 DLLMGateway = Annotated[Optional[LLMGateway], Depends(LLMGateway)]

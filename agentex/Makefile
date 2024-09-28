@@ -21,4 +21,4 @@ prod:
 
 # Command to test (just an example)
 test:
-	pytest tests/
+	poetry run pytest --cov=agentex
