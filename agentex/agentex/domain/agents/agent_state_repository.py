@@ -1,8 +1,9 @@
-import json
-from typing import Optional
+from typing import Optional, Annotated
+
+from fastapi import Depends
 
 from agentex.adapters.memory.port import DMemoryRepository
-from agentex.domain.agent_state.entities import AgentState
+from agentex.domain.entities.agent_state import AgentState
 
 
 class AgentStateRepository:
@@ -34,3 +35,6 @@ class AgentStateRepository:
     async def delete(self, task_id: str) -> None:
         """Delete the AgentState from Redis."""
         await self.memory_repo.delete(task_id)
+
+
+DAgentStateRepository = Annotated[AgentStateRepository, Depends(AgentStateRepository)]
