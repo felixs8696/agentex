@@ -2,7 +2,7 @@ from typing import Optional, Annotated
 
 from fastapi import Depends
 
-from agentex.adapters.memory.port import DMemoryRepository
+from agentex.adapters.kv_store.port import DMemoryRepository
 from agentex.domain.entities.agent_state import AgentState
 
 

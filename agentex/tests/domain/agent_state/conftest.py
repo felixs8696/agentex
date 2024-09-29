@@ -2,7 +2,7 @@ from typing import List, Any, Dict
 
 import pytest
 
-from agentex.adapters.memory.port import MemoryRepository
+from agentex.adapters.kv_store.port import MemoryRepository
 
 
 class FakeMemoryRepo(MemoryRepository):

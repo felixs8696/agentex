@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   temporal:
     container_name: temporal
@@ -8,7 +10,7 @@ services:
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
     image: temporalio/auto-setup:1.21.4
     networks:
-      - temporal-network
+      - agentex-network
     ports:
       - 7233:7233
     volumes:
@@ -23,7 +25,7 @@ services:
       - TEMPORAL_CLI_ADDRESS=temporal:7233
     image: temporalio/admin-tools:1.21.4
     networks:
-      - temporal-network
+      - agentex-network
     stdin_open: true
     tty: true
 
@@ -36,15 +38,32 @@ services:
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
     image: temporalio/ui:2.17.2
     networks:
-      - temporal-network
+      - agentex-network
     ports:
       - 8080:8080
 
   redis:
     container_name: redis
     image: redis/redis-stack-server:7.2.0-v6
+    networks:
+      - agentex-network  # Redis should also be on the same network
     ports:
       - 16379:6379
+
+  postgres:
+    container_name: postgres
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agentex
+    ports:
+      - "5432:5432"
+    networks:
+      - agentex-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    user: postgres
 
   agentex-backend:
     container_name: agentex-backend
@@ -54,18 +73,34 @@ services:
     environment:
       - ENV=development
       - UVICORN_PORT=5003
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/agentex
     ports:
       - "5003:5003"
     volumes:
-      - .:/app  # Mount your app directory
-    command: uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
+      - .:/app
     depends_on:
       - temporal
       - redis
+      - postgres
     networks:
-      - temporal-network
+      - agentex-network
+    command: >
+      bash -c "
+      until pg_isready -h postgres -p 5432; do
+        echo 'Waiting for PostgreSQL main...';
+        sleep 2;
+      done &&
+      pushd database/migrations &&
+      alembic upgrade head &&
+      popd &&
+      uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
+      "
+
+
+volumes:
+  postgres-data:
 
 networks:
-  temporal-network:
+  agentex-network:
     driver: bridge
-    name: temporal-network
+    name: agentex-network

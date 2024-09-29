@@ -1,32 +1,32 @@
 from abc import ABC, abstractmethod
-from typing import Annotated, List
+from typing import Annotated, List, TypeVar, Generic, Optional
 
 from fastapi import Depends
 
-from agentex.domain.entities.agents import Agent
+T = TypeVar("T")
 
 
-class AgentRepository(ABC):
-
-    @abstractmethod
-    async def get(self, id: str) -> Agent:
-        raise NotImplementedError
+class CRUDRepository(ABC, Generic[T]):
 
     @abstractmethod
-    async def create(self, agent: Agent) -> Agent:
-        raise NotImplementedError
+    async def create(self, item: T) -> T:
+        pass
 
     @abstractmethod
-    async def update(self, agent: Agent) -> Agent:
-        raise NotImplementedError
+    async def get(self, id: Optional[str], name: Optional[str]) -> T:
+        pass
 
     @abstractmethod
-    async def delete(self, id: str) -> None:
-        raise NotImplementedError
+    async def update(self, item: T) -> T:
+        pass
 
     @abstractmethod
-    async def list(self) -> List[Agent]:
-        raise NotImplementedError
+    async def delete(self, id: Optional[str], name: Optional[str]) -> T:
+        pass
+
+    @abstractmethod
+    async def list(self) -> List[T]:
+        pass
 
 
-DAgentRepository = Annotated[AgentRepository, Depends(AgentRepository)]
+DCRUDRepository = Annotated[CRUDRepository, Depends(CRUDRepository)]

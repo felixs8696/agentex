@@ -3,7 +3,7 @@ from typing import Any, Annotated, Optional, List, Dict
 import redis.asyncio as redis
 from fastapi import Depends
 
-from agentex.adapters.memory.port import MemoryRepository
+from agentex.adapters.kv_store.port import MemoryRepository
 
 
 class RedisRepository(MemoryRepository):

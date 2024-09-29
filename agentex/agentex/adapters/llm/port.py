@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Annotated, Optional
 from fastapi import Depends
 
-from agentex.external.llm.entities import Message
+from agentex.adapters.llm.entities import Message
 
 
 class LLMGateway(ABC):

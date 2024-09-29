@@ -1,10 +1,10 @@
 from typing import Annotated, Optional
 
 import litellm as llm
-from agentex.external.llm.entities import Message
 from fastapi import Depends
 
-from agentex.external.llm.port import LLMGateway
+from agentex.adapters.llm.entities import Message
+from agentex.adapters.llm.port import LLMGateway
 
 
 class LiteLLMGateway(LLMGateway):

@@ -1,6 +1,19 @@
 # Use Python 3.12 as the base image
 FROM python:3.12-slim
 
+RUN apt-get update && apt-get install -y \
+    htop \
+    vim \
+    curl \
+    python3-dev \
+    postgresql-client \
+    build-essential \
+    libpq-dev \
+    gcc \
+    netcat-openbsd \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory in the container
 WORKDIR /app
 
@@ -23,6 +36,9 @@ COPY . /app
 
 # Expose the FastAPI port
 EXPOSE 5003
+
+# Set PYTHONPATH to include /app directory for module imports
+ENV PYTHONPATH=/app
 
 # Run the FastAPI app
 CMD ["uvicorn", "agentex.api.app:app", "--host", "0.0.0.0", "--port", "5003", "--reload"]
