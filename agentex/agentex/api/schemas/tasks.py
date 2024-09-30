@@ -1,9 +1,10 @@
 from pydantic import Field
 
+from agentex.domain.entities.tasks import Task
 from agentex.utils.model_utils import BaseModel
 
 
-class TaskRequest(BaseModel):
+class CreateTaskRequest(BaseModel):
     agent: str = Field(
         ...,
         title="The unique name of the agent to use to run the task",
@@ -14,8 +15,5 @@ class TaskRequest(BaseModel):
     )
 
 
-class TaskResponse(BaseModel):
-    content: str = Field(
-        ...,
-        title="The response content from the agent",
-    )
+class CreateTaskResponse(Task):
+    pass

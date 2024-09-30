@@ -27,8 +27,8 @@ class BaseModel(PydanticBaseModel):
             return None
         return cls.model_validate_json(json_str)
 
-    def to_json(self) -> str:
-        return self.model_dump_json()
+    def to_json(self, *args, **kwargs) -> str:
+        return self.model_dump_json(*args, **kwargs)
 
-    def to_dict(self) -> Dict[str, Any]:
-        return self.model_dump()
+    def to_dict(self, *args, **kwargs) -> Dict[str, Any]:
+        return self.model_dump(*args, **kwargs)

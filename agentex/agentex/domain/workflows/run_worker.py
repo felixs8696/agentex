@@ -8,9 +8,9 @@ from agentex.adapters.kv_store.adapter_redis import RedisRepository
 from agentex.adapters.llm.adapter_litellm import LiteLLMGateway
 from agentex.config.dependencies import GlobalDependencies
 from agentex.config.environment_variables import EnvironmentVariables
-from agentex.domain.services.agents import AgentStateRepository
+from agentex.domain.services.agents.agent_state_repository import AgentStateRepository
 from agentex.domain.services.agents.agent_state_service import AgentStateService
-from agentex.domain.workflows.agent_workflow import AgentWorkflow, AgentActivities
+from agentex.domain.workflows.agent_task_workflow import AgentTaskWorkflow, AgentTaskActivities
 from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE
 from agentex.utils.logging import make_logger
 
@@ -31,7 +31,7 @@ async def run_worker(task_queue=AGENT_TASK_TASK_QUEUE):
         f"Continuing on from run_worker with temporal client - {client is not None}. Task queue: {task_queue}"
     )
 
-    agent_activities = AgentActivities(
+    agent_activities = AgentTaskActivities(
         agent_state_service=AgentStateService(
             repository=AgentStateRepository(
                 memory_repo=RedisRepository(
@@ -39,7 +39,9 @@ async def run_worker(task_queue=AGENT_TASK_TASK_QUEUE):
                 )
             )
         ),
-        llm_gateway=LiteLLMGateway(),
+        llm_gateway=LiteLLMGateway(
+            environment_variables=environment_variables,
+        ),
     )
 
     # Run the worker
@@ -50,9 +52,10 @@ async def run_worker(task_queue=AGENT_TASK_TASK_QUEUE):
             max_workers=10,
         ),
         workflows=[
-            AgentWorkflow,
+            AgentTaskWorkflow,
         ],
         activities=[
+            agent_activities.init_task_state,
             agent_activities.decide_action,
             agent_activities.take_action,
         ],

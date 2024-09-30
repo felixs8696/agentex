@@ -13,7 +13,7 @@ class CRUDRepository(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    async def get(self, id: Optional[str], name: Optional[str]) -> T:
+    async def get(self, id: Optional[str] = None, name: Optional[str] = None) -> T:
         pass
 
     @abstractmethod
@@ -21,7 +21,7 @@ class CRUDRepository(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    async def delete(self, id: Optional[str], name: Optional[str]) -> T:
+    async def delete(self, id: Optional[str] = None, name: Optional[str] = None) -> T:
         pass
 
     @abstractmethod

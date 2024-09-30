@@ -2,8 +2,8 @@ from typing import Optional, List, Annotated
 
 from fastapi import Depends
 
-from agentex.domain.services.agents import DAgentRepository
 from agentex.domain.entities.agents import Agent
+from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.utils.ids import orm_id
 from agentex.utils.logging import make_logger
 

@@ -18,7 +18,7 @@ class AsyncRuntime(ABC):
         task_timeout: timedelta,
         execution_timeout: timedelta,
         **kwargs,
-    ) -> Any:
+    ) -> str:
         pass
 
     @abstractmethod

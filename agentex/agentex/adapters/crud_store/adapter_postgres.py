@@ -77,16 +77,9 @@ class PostgresCRUDRepository(CRUDRepository[T], Generic[M, T]):
             await session.commit()
             return self.entity.from_orm(orm)
 
-    async def get(self, id: Optional[str], name: Optional[str]) -> T:
+    async def get(self, id: Optional[str] = None, name: Optional[str] = None) -> T:
         async with self.start_async_db_session(True) as session, async_sql_exception_handler():
-            if id is not None:
-                result = session.scalar(select(T).filter(T.id == id))
-            elif name is not None:
-                result = session.scalar(select(T).filter(T.name == name))
-            else:
-                raise ClientError("Either id or name must be provided.")
-            if result is None:
-                raise ItemDoesNotExist(f'Item with id "{id}" does not exist.')
+            result = await self._get(session, id, name)
             return self.entity.from_orm(result)
 
     async def update(self, item: T) -> T:
@@ -96,24 +89,32 @@ class PostgresCRUDRepository(CRUDRepository[T], Generic[M, T]):
             await session.commit()
             return self.entity.from_orm(orm)
 
-    async def delete(self, id: Optional[str], name: Optional[str]) -> T:
+    async def delete(self, id: Optional[str] = None, name: Optional[str] = None) -> T:
         async with self.start_async_db_session(True) as session, async_sql_exception_handler():
-            if id is not None:
-                result = session.scalar(select(T).filter(T.id == id))
-            elif name is not None:
-                result = session.scalar(select(T).filter(T.name == name))
-            else:
-                raise ClientError("Either id or name must be provided.")
-            if result is None:
-                raise ItemDoesNotExist(f'Item with id "{id}" does not exist.')
+            result = await self._get(session, id, name)
             session.delete(result)
             await session.commit()
             return self.entity.from_orm(result)
 
     async def list(self) -> List[T]:
         async with self.start_async_db_session(False) as session, async_sql_exception_handler():
-            results = session.execute(select(T)).scalars()
+            results = await session.execute(select(self.orm)).scalars()
             return [self.entity.from_orm(result) for result in results]
+
+    async def _get(self, session: AsyncSession, id: Optional[str] = None, name: Optional[str] = None) -> M:
+        if id is not None:
+            result = await session.scalar(select(self.orm).filter(self.orm.id == id))
+        elif name is not None:
+            result = await session.scalar(select(self.orm).filter(self.orm.name == name))
+        else:
+            raise ClientError("Either id or name must be provided.")
+        if result is None:
+            if id is not None:
+                error_message = f"Item with id '{id}' does not exist."
+            else:
+                error_message = f"Item with name '{name}' does not exist."
+            raise ItemDoesNotExist(error_message)
+        return result
 
 
 DPostgresCRUDRepository = Annotated[PostgresCRUDRepository, Depends(PostgresCRUDRepository)]
