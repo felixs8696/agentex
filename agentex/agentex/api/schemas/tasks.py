@@ -1,6 +1,8 @@
 from pydantic import Field
 
+from agentex.domain.entities.agent_state import AgentState
 from agentex.domain.entities.tasks import Task
+from agentex.domain.entities.workflows import WorkflowState
 from agentex.utils.model_utils import BaseModel
 
 
@@ -17,3 +19,10 @@ class CreateTaskRequest(BaseModel):
 
 class CreateTaskResponse(Task):
     pass
+
+
+class GetTaskResponse(Task, AgentState):
+    state: WorkflowState = Field(
+        ...,
+        title="The current state of the task",
+    )

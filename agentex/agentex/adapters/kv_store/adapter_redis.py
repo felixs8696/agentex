@@ -4,11 +4,12 @@ import redis.asyncio as redis
 from fastapi import Depends
 
 from agentex.adapters.kv_store.port import MemoryRepository
+from agentex.config.dependencies import DEnvironmentVariables
 
 
 class RedisRepository(MemoryRepository):
-    def __init__(self, redis_url: str):
-        self.redis = redis.from_url(redis_url)
+    def __init__(self, environment_variables: DEnvironmentVariables):
+        self.redis = redis.from_url(environment_variables.REDIS_URL)
 
     async def set(self, key: str, value: Any) -> None:
         return await self.redis.set(key, value)

@@ -35,7 +35,7 @@ async def run_worker(task_queue=AGENT_TASK_TASK_QUEUE):
         agent_state_service=AgentStateService(
             repository=AgentStateRepository(
                 memory_repo=RedisRepository(
-                    redis_url=environment_variables.REDIS_URL,
+                    environment_variables=environment_variables,
                 )
             )
         ),

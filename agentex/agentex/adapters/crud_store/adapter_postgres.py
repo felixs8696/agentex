@@ -32,7 +32,7 @@ async def async_sql_exception_handler():
             )
         else:
             raise ServiceError(
-                message="Invalid input resulted in constraint violation", detail=str(e)
+                message=f"Invalid input resulted in constraint violation: {e}", detail=str(e)
             )
     except exc.NoResultFound as e:
         raise ItemDoesNotExist(message="No record found for given key", detail=str(e))

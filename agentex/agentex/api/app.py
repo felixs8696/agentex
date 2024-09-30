@@ -12,7 +12,7 @@ from starlette.responses import Response
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
 
 from agentex.api.schemas.agents import CreateAgentResponse, CreateAgentRequest
-from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest
+from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest, GetTaskResponse
 from agentex.config import dependencies
 from agentex.domain.exceptions import GenericException
 from agentex.domain.use_cases.crud.agent_crud_service import DAgentCRUDService
@@ -128,12 +128,26 @@ async def create_agent(
     response_model=CreateTaskResponse,
     tags=[RouteTag.TASKS],
 )
-async def submit_task(
+async def create_task(
     request: CreateTaskRequest,
     task_use_case: DTaskUseCase,
 ) -> CreateTaskResponse:
-    task = await task_use_case.execute(
+    task = await task_use_case.create(
         agent_name=request.agent,
         prompt=request.prompt
     )
     return CreateTaskResponse.from_orm(task)
+
+
+@app.get(
+    "/tasks/{task_id}",
+    response_model=GetTaskResponse,
+    tags=[RouteTag.TASKS],
+)
+async def get_task(
+    task_id: str,
+    task_use_case: DTaskUseCase,
+) -> GetTaskResponse:
+    get_task_response = await task_use_case.get(task_id)
+    return get_task_response
+

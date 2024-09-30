@@ -2,12 +2,12 @@ from typing import Optional, Annotated
 
 from fastapi import Depends
 
-from agentex.adapters.kv_store.port import DMemoryRepository
+from agentex.adapters.kv_store.adapter_redis import DRedisRepository
 from agentex.domain.entities.agent_state import AgentState
 
 
 class AgentStateRepository:
-    def __init__(self, memory_repo: DMemoryRepository):
+    def __init__(self, memory_repo: DRedisRepository):
         self.memory_repo = memory_repo
 
     @staticmethod
