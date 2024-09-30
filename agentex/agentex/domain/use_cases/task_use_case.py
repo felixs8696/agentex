@@ -54,13 +54,20 @@ class TaskUseCase:
                     {
                         "type": "function",
                         "function": {
-                            "name": "dummy_tool",
-                            "description": """
-Call this just to check that you can call a tool from the agent.
-You must call this tool, but just do it once.
-                        """,
-                            "parameters": {},
-                        }
+                            "name": "get_current_weather",
+                            "description": "Get the current weather in a given location",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "location": {
+                                        "type": "string",
+                                        "description": "The city and state, e.g. San Francisco, CA",
+                                    },
+                                    "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+                                },
+                                "required": ["location"],
+                            },
+                        },
                     }
                 ],
                 tool_choice="auto",

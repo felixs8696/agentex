@@ -149,7 +149,7 @@ Message = Annotated[
 
 
 class LLMChoice(BaseModel):
-    finish_reason: Literal["stop", "length", "content_filter"] = Field(
+    finish_reason: Literal["stop", "length", "content_filter", "tool_calls"] = Field(
         ...,
         description="The reason for the choice to finish."
     )

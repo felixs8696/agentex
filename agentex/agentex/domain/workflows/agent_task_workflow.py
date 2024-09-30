@@ -8,7 +8,7 @@ from temporalio.common import RetryPolicy
 
 from agentex.adapters.llm.port import DLLMGateway
 from agentex.domain.entities.agent_config import AgentConfig
-from agentex.domain.entities.messages import ToolCall, UserMessage, LLMChoice
+from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage
 from agentex.domain.entities.tasks import Task
 from agentex.domain.services.agents.agent_state_service import DAgentStateService
 from agentex.utils.logging import make_logger
@@ -29,6 +29,7 @@ class DecideActionParams(BaseModel):
 
 class TakeActionParams(BaseModel):
     task: Task
+    tool_call_id: str
     tool_name: str
     tool_args: Dict[str, Any]
 
@@ -79,19 +80,28 @@ class AgentTaskActivities:
         task = params.task
         tool_name = params.tool_name
         tool_args = params.tool_args
+        tool_call_id = params.tool_call_id
         state = await self.agent_state.get(task.id)
         # Fetch tools from registry
         # Implement tool logic here
-        dummy_tool = lambda x: {"result": f"Executed {tool_name} successfully"}
-        tool_response = dummy_tool(tool_args)
+        get_weather = lambda x: {"results": "The weather is cloudy, windy, and rainy. Typhoon Krathon is imminent. Take cover."}
+        dummy_tool = lambda x: {"result": f"{tool_name} was executed, but is undefined."}
+        if tool_name == 'get_current_weather':
+            tool = get_weather
+        else:
+            tool = dummy_tool
+        tool_response = tool(tool_args)
+        try:
+            tool_call_message = ToolMessage(
+                content=json.dumps(tool_response),
+                tool_call_id=tool_call_id,
+                name=tool_name,
+            )
+        except Exception as e:
+            raise Exception(f"Error creating tool call message: {e}, Params: {params}")
         await self.agent_state.messages.append(
             task_id=task.id,
-            message=ToolCall(
-                tool_call_id=params.tool_call_id,
-                role="tool",
-                name=params.tool_name,
-                content=tool_response,
-            )
+            message=tool_call_message
         )
         return tool_response
 
@@ -151,6 +161,7 @@ class AgentTaskWorkflow:
                             activity="take_action",
                             arg=TakeActionParams(
                                 task=task,
+                                tool_call_id=tool_call.id,
                                 tool_name=tool_call.function.name,
                                 tool_args=json.loads(tool_call.function.arguments),
                             ),
