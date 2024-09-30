@@ -1,12 +1,28 @@
+import asyncio
+import json
+from datetime import timedelta
+from typing import Dict, Any
+
 from temporalio import workflow, activity
+from temporalio.common import RetryPolicy
 
 from agentex.adapters.llm.port import DLLMGateway
-from agentex.adapters.kv_store.port import DMemoryRepository
-from agentex.domain.agent_state.agent_state_repository import AgentStateRepository
-from agentex.domain.agent_state.agent_state_service import AgentStateService, DAgentStateService
+from agentex.domain.agents.agent_state_service import DAgentStateService
 from agentex.domain.entities.agent_config import AgentConfig
-from agentex.domain.entities.agent_state import AgentState
+from agentex.domain.entities.messages import ToolCall
 from agentex.domain.entities.tasks import Task
+from agentex.utils.model_utils import BaseModel
+
+
+class DecideActionParams(BaseModel):
+    task_id: str
+    agent_config: AgentConfig
+
+
+class TakeActionParams(BaseModel):
+    task_id: str
+    tool_name: str
+    tool_args: Dict[str, Any]
 
 
 class AgentActivities:
@@ -19,57 +35,84 @@ class AgentActivities:
         self.agent_state = agent_state_service
         self.llm = llm_gateway
 
-    @activity.defn
-    async def decide_next_action(self, task_id: str, agent_config: AgentConfig):
+    @activity.defn(name="decide_action")
+    async def decide_action(self, params: DecideActionParams):
+        task_id = params.task_id
+        agent_config = params.agent_config
+
         state = await self.agent_state.get(task_id)
-        return await self.llm.acompletion(
+        response = await self.llm.acompletion(
             **agent_config.dict(),
             messages=state.messages,
         )
+        decision_response = response.choices[0]
+        await self.agent_state.messages.append(decision_response.message)
+        return decision_response
 
-    @activity.defn
-    async def take_action(self, task_id: str, tool_name: str, tool_args: str):
+    @activity.defn(name="take_action")
+    async def take_action(self, params: TakeActionParams):
+        task_id = params.task_id
+        tool_name = params.tool_name
+        tool_args = params.tool_args
         state = await self.agent_state.get(task_id)
         # Fetch tools from registry
         # Implement tool logic here
-        return {"result": f"Executed {tool_name} successfully"}
+        dummy_tool = lambda x: {"result": f"Executed {tool_name} successfully"}
+        tool_response = dummy_tool(tool_args)
+        await self.agent_state.messages.append(ToolCall(
+            tool_call_id=params.tool_call_id,
+            role="tool",
+            name=params.tool_name,
+            content=tool_response,
+        ))
+        return tool_response
 
 
 @workflow.defn
 class AgentWorkflow:
 
     @workflow.run
-    async def run(self, task: Task):
-        agent_service = AgentStateService(AgentStateRepository(DMemoryRepository()))
-        # Initialize agent state
-        state = AgentState()  # Replace with actual initialization
-        await agent_service.set(task_id, state)
-
-        while True:
+    async def run(self, task: Task, agent_config: AgentConfig):
+        content = None
+        finish_reason = None
+        while finish_reason not in ("stop", "length", "content_filter"):
             # Execute decision activity
-            decision = await workflow.execute_activity(make_decision_activity, task_id, prompt, timeout=60)
-            if decision["complete"]:
+            decision_response = await workflow.execute_activity(
+                activity="decide_action",
+                arg=DecideActionParams(
+                    task_id=task.id,
+                    agent_config=agent_config,
+                ),
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+            )
+            finish_reason = decision_response.finish_reason
+            decision = decision_response.message
+            tool_calls = decision.tool_calls
+
+            if decision.content:
+                content = decision.content
                 break
 
             # Execute tool activities if requested
-            if "tools" in decision:
-                for tool in decision["tools"]:
-                    await workflow.execute_activity(tool_activity, task_id, tool)
+            take_action_activities = []
+            if decision.tool_calls:
+                for tool_call in tool_calls:
+                    take_action_activity = asyncio.create_task(
+                        workflow.execute_activity(
+                            activity="take_action",
+                            arg=TakeActionParams(
+                                task_id=task.id,
+                                tool_name=tool_call.function.name,
+                                tool_args=json.loads(tool_call.function.arguments),
+                            ),
+                            start_to_close_timeout=timedelta(seconds=60),
+                            retry_policy=RetryPolicy(maximum_attempts=5),
+                        )
+                    )
+                    take_action_activities.append(take_action_activity)
 
-        return {"status": "completed"}
+            # Wait for all tool activities to complete
+            await asyncio.gather(*take_action_activities)
 
-
-@activity.defn
-async def make_decision_activity(task_id: str, prompt: str):
-    agent_service = AgentStateService(AgentStateRepository(DMemoryRepository()))
-    # Simulate LLM call to make a decision
-    state = await agent_service.get_state(task_id)
-    # ... implement LLM logic here
-    return {"complete": False, "tools": ["tool_1", "tool_2"]}  # Example return
-
-
-@activity.defn
-async def tool_activity(task_id: str, tool_name: str):
-    agent_service = AgentStateService(AgentStateRepository(DMemoryRepository()))
-    # Implement tool logic here
-    return {"result": f"Executed {tool_name} successfully"}
+        return {"status": "completed", "content": content}

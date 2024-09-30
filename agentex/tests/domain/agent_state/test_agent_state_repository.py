@@ -1,6 +1,6 @@
 import pytest
 
-from agentex.adapters.llm.entities import SystemMessage, UserMessage, AssistantMessage
+from agentex.domain.entities.messages import SystemMessage, UserMessage, AssistantMessage
 from agentex.domain.agent_state.agent_state_repository import AgentStateRepository
 from agentex.domain.entities.agent_state import AgentState
 

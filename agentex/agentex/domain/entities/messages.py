@@ -129,6 +129,10 @@ class ToolMessage(BaseModel):
         ...,
         description="Tool call that this message is responding to."
     )
+    name: str = Field(
+        ...,
+        description="The name of the tool called."
+    )
 
 
 Message = Annotated[

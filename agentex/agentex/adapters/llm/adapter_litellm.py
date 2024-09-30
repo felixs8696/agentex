@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 import litellm as llm
 from fastapi import Depends
 
-from agentex.adapters.llm.entities import Message
+from agentex.domain.entities.messages import Message
 from agentex.adapters.llm.port import LLMGateway
 
 

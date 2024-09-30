@@ -1,29 +1,46 @@
 version: '3.8'
 
 services:
+  temporal-postgresql:
+    container_name: temporal-postgresql
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+    image: postgres:12
+    networks:
+      - agentex-network
+    ports:
+      - 5433:5432
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql/data
+
   temporal:
     container_name: temporal
+    depends_on:
+      - temporal-postgresql
     environment:
-      - DB=sqlite
-      - NUM_HISTORY_SHARDS=3
-      - SKIP_SCHEMA_SETUP=true
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
-    image: temporalio/auto-setup:1.21.4
+    image: temporalio/auto-setup:1.25.0
     networks:
       - agentex-network
     ports:
       - 7233:7233
     volumes:
       - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
-      - ./temporal/config_template.yaml:/etc/temporal/config/config_template.yaml
 
   temporal-admin-tools:
     container_name: temporal-admin-tools
     depends_on:
       - temporal
     environment:
+      - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CLI_ADDRESS=temporal:7233
-    image: temporalio/admin-tools:1.21.4
+    image: temporalio/admin-tools:1.25.0-tctl-1.18.1-cli-1.1.0
     networks:
       - agentex-network
     stdin_open: true
@@ -36,69 +53,90 @@ services:
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
-    image: temporalio/ui:2.17.2
+    image: temporalio/ui:2.31.0
     networks:
       - agentex-network
     ports:
       - 8080:8080
 
   redis:
-    container_name: redis
-    image: redis/redis-stack-server:7.2.0-v6
+    image: "redis:7.4.0-alpine"
+    ports:
+      - "6379:6379"
     networks:
       - agentex-network  # Redis should also be on the same network
-    ports:
-      - 16379:6379
-
-  postgres:
-    container_name: postgres
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: agentex
-    ports:
-      - "5432:5432"
-    networks:
-      - agentex-network
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    user: postgres
+      - redis-data:/data
+    command: [ "redis-server", "--appendonly", "yes" ]
 
-  agentex-backend:
-    container_name: agentex-backend
+  temporal-worker:
+    container_name: temporal-worker
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.temporal.worker
     environment:
-      - ENV=development
-      - UVICORN_PORT=5003
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/agentex
-    ports:
-      - "5003:5003"
-    volumes:
-      - .:/app
+      - TEMPORAL_ADDRESS=temporal:7233
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - agentex-network
     depends_on:
       - temporal
       - redis
-      - postgres
-    networks:
-      - agentex-network
-    command: >
-      bash -c "
-      until pg_isready -h postgres -p 5432; do
-        echo 'Waiting for PostgreSQL main...';
-        sleep 2;
-      done &&
-      pushd database/migrations &&
-      alembic upgrade head &&
-      popd &&
-      uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
-      "
+    command: [ "python", "-m", "agentex.domain.workflows.run_worker" ]
+
+#  postgres:
+#    container_name: postgres
+#    image: postgres:17
+#    environment:
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_DB: agentex
+#    ports:
+#      - "5432:5432"
+#    networks:
+#      - agentex-network
+#    volumes:
+#      - postgres-data:/var/lib/postgresql/data
+#    user: postgres
+#
+#  agentex-backend:
+#    container_name: agentex-backend
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    environment:
+#      - ENV=development
+#      - UVICORN_PORT=5003
+#      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/agentex
+#      - TEMPORAL_ADDRESS=temporal:7233
+#      - REDIS_URL=redis://redis:6379
+#    ports:
+#      - "5003:5003"
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - temporal
+#      - redis
+#      - postgres
+#    networks:
+#      - agentex-network
+#    command: >
+#      bash -c "
+#      until pg_isready -h postgres -p 5432; do
+#        echo 'Waiting for PostgreSQL main...';
+#        sleep 2;
+#      done &&
+#      pushd database/migrations &&
+#      alembic upgrade head &&
+#      popd &&
+#      uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
+#      "
 
 
 volumes:
+  temporal-postgres-data:
   postgres-data:
+  redis-data:
 
 networks:
   agentex-network:

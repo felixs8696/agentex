@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional
 
 from pydantic import Field
 
-from agentex.adapters.llm.entities import Message
+from agentex.domain.entities.messages import Message
 from agentex.utils.model_utils import BaseModel
 
 

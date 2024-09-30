@@ -3,9 +3,13 @@ from typing import Annotated, Optional
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, AsyncEngine, create_async_engine
+from temporalio.client import Client as TemporalClient
 
 from agentex.config.environment_variables import EnvironmentVariables, Environment
 from agentex.utils.database import async_db_engine_creator
+from agentex.utils.logging import make_logger
+
+logger = make_logger(__name__)
 
 
 class Singleton(type):
@@ -21,11 +25,31 @@ class GlobalDependencies(metaclass=Singleton):
 
     def __init__(self):
         self.environment_variables: EnvironmentVariables = EnvironmentVariables.refresh()
+        self.temporal_client: Optional[TemporalClient] = None
         self.database_async_read_write_engine: Optional[AsyncEngine] = None
         # self.database_async_read_only_engine: Optional[AsyncEngine] = None
 
+    async def create_temporal_client(self):
+        if self.environment_variables.TEMPORAL_ADDRESS in [
+            "false",
+            "False",
+            "null",
+            "None",
+            "",
+            "undefined",
+        ]:
+            return None
+        else:
+            return await TemporalClient.connect(self.environment_variables.TEMPORAL_ADDRESS)
+
     async def load(self):
         self.environment_variables = EnvironmentVariables.refresh()
+
+        try:
+            self.temporal_client = await self.create_temporal_client()
+        except Exception as e:
+            logger.error(f"Failed to initialize temporal client: {e}")
+            self.temporal_client = None
 
         echo_db_engine = self.environment_variables.ENV == Environment.DEV
         async_db_pool_size = 10
@@ -122,6 +146,14 @@ def database_async_read_write_session_maker(
 DDatabaseAsyncReadWriteSessionMaker = Annotated[
     async_sessionmaker[AsyncSession], Depends(database_async_read_write_session_maker)
 ]
+
+
 # DDatabaseAsyncReadOnlySessionMaker = Annotated[
 #     async_sessionmaker[AsyncSession], Depends(database_async_read_only_session_maker)
 # ]
+
+async def temporal_client() -> TemporalClient:
+    return GlobalDependencies().temporal_client
+
+
+DTemporalClient = Annotated[TemporalClient, Depends(temporal_client)]

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from agentex.adapters.llm.adapter_litellm import DLiteLLMGateway
-from agentex.adapters.llm.entities import Message, UserMessage
+from agentex.domain.entities.messages import Message, UserMessage
 from agentex.domain.entities.tasks import Task
 from agentex.utils.ids import orm_id
 
