@@ -90,7 +90,11 @@ services:
     volumes:
       - .:/app
       - .env:/app/.env
-    command: [ "python", "-m", "agentex.domain.workflows.run_worker" ]
+      - ./scripts/wait-for-it.sh:/usr/local/bin/wait-for-it.sh
+    command: >
+      bash -c "
+      /usr/local/bin/wait-for-it.sh temporal:7233 --timeout=30 -- python -m agentex.domain.workflows.run_worker
+      "
 
   postgres:
     container_name: postgres
