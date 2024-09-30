@@ -84,53 +84,53 @@ services:
       - redis
     command: [ "python", "-m", "agentex.domain.workflows.run_worker" ]
 
-#  postgres:
-#    container_name: postgres
-#    image: postgres:17
-#    environment:
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: postgres
-#      POSTGRES_DB: agentex
-#    ports:
-#      - "5432:5432"
-#    networks:
-#      - agentex-network
-#    volumes:
-#      - postgres-data:/var/lib/postgresql/data
-#    user: postgres
-#
-#  agentex-backend:
-#    container_name: agentex-backend
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    environment:
-#      - ENV=development
-#      - UVICORN_PORT=5003
-#      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/agentex
-#      - TEMPORAL_ADDRESS=temporal:7233
-#      - REDIS_URL=redis://redis:6379
-#    ports:
-#      - "5003:5003"
-#    volumes:
-#      - .:/app
-#    depends_on:
-#      - temporal
-#      - redis
-#      - postgres
-#    networks:
-#      - agentex-network
-#    command: >
-#      bash -c "
-#      until pg_isready -h postgres -p 5432; do
-#        echo 'Waiting for PostgreSQL main...';
-#        sleep 2;
-#      done &&
-#      pushd database/migrations &&
-#      alembic upgrade head &&
-#      popd &&
-#      uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
-#      "
+  postgres:
+    container_name: postgres
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agentex
+    ports:
+      - "5432:5432"
+    networks:
+      - agentex-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    user: postgres
+
+  agentex-backend:
+    container_name: agentex-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ENV=development
+      - UVICORN_PORT=5003
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/agentex
+      - TEMPORAL_ADDRESS=temporal:7233
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "5003:5003"
+    volumes:
+      - .:/app
+    depends_on:
+      - temporal
+      - redis
+      - postgres
+    networks:
+      - agentex-network
+    command: >
+      bash -c "
+      until pg_isready -h postgres -p 5432; do
+        echo 'Waiting for PostgreSQL main...';
+        sleep 2;
+      done &&
+      pushd database/migrations &&
+      alembic upgrade head &&
+      popd &&
+      uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
+      "
 
 
 volumes:

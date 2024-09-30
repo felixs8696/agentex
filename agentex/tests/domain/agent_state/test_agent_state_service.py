@@ -1,8 +1,8 @@
 import pytest
 from agentex.domain.entities.messages import SystemMessage, UserMessage, AssistantMessage
-from agentex.domain.agent_state.agent_state_repository import AgentStateRepository
 from agentex.domain.entities.agent_state import AgentState
-from agentex.domain.agent_state.agent_state_service import AgentStateService
+from agentex.domain.services.agents.agent_state_repository import AgentStateRepository
+from agentex.domain.services.agents.agent_state_service import AgentStateService
 
 
 @pytest.mark.asyncio

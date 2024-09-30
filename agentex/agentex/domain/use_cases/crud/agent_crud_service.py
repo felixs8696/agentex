@@ -2,7 +2,7 @@ from typing import Optional, List, Annotated
 
 from fastapi import Depends
 
-from agentex.domain.agents.agent_repository import DAgentRepository
+from agentex.domain.services.agents import DAgentRepository
 from agentex.domain.entities.agents import Agent
 from agentex.utils.ids import orm_id
 from agentex.utils.logging import make_logger

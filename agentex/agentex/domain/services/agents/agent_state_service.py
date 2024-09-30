@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional, Annotated
 
 from fastapi import Depends
 
-from agentex.domain.agents.agent_state_repository import AgentStateRepository, DAgentStateRepository
+from agentex.domain.services.agents.agent_state_repository import AgentStateRepository, DAgentStateRepository
 from agentex.domain.entities.messages import Message
 from agentex.domain.entities.agent_state import AgentState
 

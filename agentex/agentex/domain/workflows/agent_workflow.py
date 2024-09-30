@@ -7,7 +7,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from agentex.adapters.llm.port import DLLMGateway
-from agentex.domain.agents.agent_state_service import DAgentStateService
+from agentex.domain.services.agents.agent_state_service import DAgentStateService
 from agentex.domain.entities.agent_config import AgentConfig
 from agentex.domain.entities.messages import ToolCall
 from agentex.domain.entities.tasks import Task

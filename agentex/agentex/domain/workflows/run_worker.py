@@ -8,8 +8,8 @@ from agentex.adapters.kv_store.adapter_redis import RedisRepository
 from agentex.adapters.llm.adapter_litellm import LiteLLMGateway
 from agentex.config.dependencies import GlobalDependencies
 from agentex.config.environment_variables import EnvironmentVariables
-from agentex.domain.agents.agent_state_repository import AgentStateRepository
-from agentex.domain.agents.agent_state_service import AgentStateService
+from agentex.domain.services.agents import AgentStateRepository
+from agentex.domain.services.agents.agent_state_service import AgentStateService
 from agentex.domain.workflows.agent_workflow import AgentWorkflow, AgentActivities
 from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE
 from agentex.utils.logging import make_logger
