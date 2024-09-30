@@ -5,7 +5,7 @@ install:
 
 # Command to run everything in development mode using Docker Compose
 dev:
-	docker-compose down -v && docker-compose up --build
+	docker-compose down -v && ENV=development docker-compose up --build
 
 # Command to stop and remove all services
 stop:

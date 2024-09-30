@@ -78,9 +78,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.temporal.worker
+      target: development
     environment:
       - ENV=development
       - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
       - REDIS_URL=redis://redis:6379
     networks:
       - agentex-network
@@ -93,8 +95,14 @@ services:
       - ./scripts/wait-for-it.sh:/usr/local/bin/wait-for-it.sh
     command: >
       bash -c "
-      /usr/local/bin/wait-for-it.sh temporal:7233 --timeout=30 -- python -m agentex.domain.workflows.run_worker
+      /usr/local/bin/wait-for-it.sh temporal:7233 --timeout=30 &&
+      until TEMPORAL_CLI_ADDRESS=temporal:7233 tctl --namespace default namespace describe default; do
+        echo 'Waiting for Temporal default namespace...';
+        sleep 5;
+      done &&
+      find . -name '*.py' | python -m agentex.domain.workflows.run_worker
       "
+  
 
   postgres:
     container_name: postgres
