@@ -17,7 +17,7 @@ from agentex.utils.logging import make_logger
 logger = make_logger(__name__)
 
 
-class TaskUseCase:
+class TasksUseCase:
 
     def __init__(
         self,
@@ -92,4 +92,4 @@ class TaskUseCase:
         )
 
 
-DTaskUseCase = Annotated[TaskUseCase, Depends(TaskUseCase)]
+DTaskUseCase = Annotated[TasksUseCase, Depends(TasksUseCase)]

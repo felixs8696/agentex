@@ -1,6 +1,10 @@
 import asyncio
 from typing import Annotated, Optional
 
+import aiodocker
+import docker
+from aiodocker import Docker
+from docker import DockerClient
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, AsyncEngine, create_async_engine
 from temporalio.client import Client as TemporalClient
@@ -27,6 +31,7 @@ class GlobalDependencies(metaclass=Singleton):
         self.environment_variables: EnvironmentVariables = EnvironmentVariables.refresh()
         self.temporal_client: Optional[TemporalClient] = None
         self.database_async_read_write_engine: Optional[AsyncEngine] = None
+        self.docker_client = None
         # self.database_async_read_only_engine: Optional[AsyncEngine] = None
 
     async def create_temporal_client(self):
@@ -50,6 +55,8 @@ class GlobalDependencies(metaclass=Singleton):
         except Exception as e:
             logger.error(f"Failed to initialize temporal client: {e}")
             self.temporal_client = None
+
+        self.docker_client = docker.from_env()
 
         echo_db_engine = self.environment_variables.ENV == Environment.DEV
         async_db_pool_size = 10
@@ -157,3 +164,10 @@ async def temporal_client() -> TemporalClient:
 
 
 DTemporalClient = Annotated[TemporalClient, Depends(temporal_client)]
+
+
+async def docker_client():
+    return GlobalDependencies().docker_client
+
+
+DDockerClient = Annotated[DockerClient, Depends(docker_client)]

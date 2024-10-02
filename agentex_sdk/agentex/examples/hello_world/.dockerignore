@@ -1,0 +1,14 @@
+# Python compiled files
+__pycache__/
+*.py[cod]
+
+# Environment files
+.env
+.venv/
+env/
+venv/
+
+# Distribution/Packaging files
+dist/
+build/
+*.egg-info/

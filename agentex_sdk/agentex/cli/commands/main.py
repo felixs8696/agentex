@@ -1,3 +1,5 @@
+from typing import Optional
+
 import typer
 
 app = typer.Typer(
@@ -8,9 +10,14 @@ app = typer.Typer(
 )
 
 
-@app.command()
-def echo(name: str):
-    print(f"Hello {name}")
+@app.callback(invoke_without_command=True)
+def register_action(
+    build_manifest_path: Optional[str] = typer.Option(
+        None, help="Path to the build manifest you want to use"
+    )
+):
+
+
 
 
 if __name__ == "__main__":

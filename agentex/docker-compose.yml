@@ -93,6 +93,7 @@ services:
       - .:/app
       - .env:/app/.env
       - ./scripts/wait-for-it.sh:/usr/local/bin/wait-for-it.sh
+      - /var/run/docker.sock:/var/run/docker.sock
     command: >
       bash -c "
       /usr/local/bin/wait-for-it.sh temporal:7233 --timeout=30 &&
@@ -135,6 +136,8 @@ services:
     volumes:
       - .:/app
       - .env:/app/.env
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
     depends_on:
       - temporal
       - redis
@@ -152,6 +155,7 @@ services:
       popd &&
       uvicorn agentex.api.app:app --host 0.0.0.0 --port 5003 --reload
       "
+    user: root
 
 
 volumes:

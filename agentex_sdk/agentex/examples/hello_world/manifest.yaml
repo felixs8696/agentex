@@ -1,0 +1,11 @@
+name: hello_world
+build:
+  context:
+    root: .
+    include_paths:
+      - project
+    dockerfile: Dockerfile
+    dockerignore: .dockerignore
+  image:
+    repository: agentex/examples/hello_world
+    tag: 0.0.0
