@@ -1,0 +1,20 @@
+{{- if .Values.postgres.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "agentex.fullname" . }}-postgres-pvc
+  labels:
+    {{- include "agentex.labels" . | nindent 4 }}
+  {{- if .Values.hooks.postgres.enabled }}
+  annotations:
+    "helm.sh/hook": {{ .Values.hooks.postgres.hooks }}
+    "helm.sh/hook-weight": "{{ .Values.hooks.postgres.weight }}"
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.postgres.persistence.size }}  # e.g., 1Gi
+  storageClassName: {{ .Values.postgres.persistence.storageClass | default "standard" }}  # Default to "standard" if not specified
+{{- end }}

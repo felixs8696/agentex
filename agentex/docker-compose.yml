@@ -63,15 +63,15 @@ services:
     ports:
       - 8080:8080
 
-  redis:
-    image: "redis:7.4.0-alpine"
-    ports:
-      - "6379:6379"
-    networks:
-      - agentex-network  # Redis should also be on the same network
-    volumes:
-      - redis-data:/data
-    command: [ "redis-server", "--appendonly", "yes" ]
+#  redis:
+#    image: "redis:7.4.0-alpine"
+#    ports:
+#      - "6379:6379"
+#    networks:
+#      - agentex-network  # Redis should also be on the same network
+#    volumes:
+#      - redis-data:/data
+#    command: [ "redis-server", "--appendonly", "yes" ]
 
   temporal-worker:
     container_name: temporal-worker

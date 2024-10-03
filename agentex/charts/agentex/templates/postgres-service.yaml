@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "agentex.fullname" . }}-postgres
+  {{- if .Values.hooks.postgres.enabled }}
+  annotations:
+    "helm.sh/hook": {{ .Values.hooks.postgres.hooks }}
+    "helm.sh/hook-weight": "{{ .Values.hooks.postgres.weight }}"
+  {{- end }}
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.postgres.service.port }}
+      targetPort: {{ .Values.postgres.service.port }}
+  selector:
+    app: {{ include "agentex.name" . }}
+    component: postgres

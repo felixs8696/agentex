@@ -35,10 +35,10 @@ RUN poetry install --compile --no-ansi --no-interaction && \
 COPY . /app
 
 # Expose the FastAPI port
-EXPOSE 5003
+EXPOSE 5000
 
 # Set PYTHONPATH to include /app directory for module imports
 ENV PYTHONPATH=/app
 
 # Run the FastAPI app
-CMD ["uvicorn", "agentex.api.app:app", "--host", "0.0.0.0", "--port", "5003", "--reload"]
+CMD ["uvicorn", "agentex.api.app:app", "--host", "0.0.0.0", "--port", "5000"]

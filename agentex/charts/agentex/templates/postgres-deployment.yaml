@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agentex.fullname" . }}-postgres
+  labels:
+    {{- include "agentex.labels" . | nindent 4 }}
+  {{- if .Values.hooks.postgres.enabled }}
+  annotations:
+    "helm.sh/hook": {{ .Values.hooks.postgres.hooks }}
+    "helm.sh/hook-weight": "{{ .Values.hooks.postgres.weight }}"
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "agentex.name" . }}
+      component: postgres
+  template:
+    metadata:
+      labels:
+        app: {{ include "agentex.name" . }}
+        component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.environment.POSTGRES_USER }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgres.environment.POSTGRES_PASSWORD }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.environment.POSTGRES_DB }}
+          ports:
+            - containerPort: {{ .Values.postgres.service.port }}
+          {{- if .Values.postgres.persistence.enabled }}
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+          {{- end }}
+      {{- if .Values.postgres.persistence.enabled }}
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: {{ include "agentex.fullname" . }}-postgres-pvc
+      {{- end }}

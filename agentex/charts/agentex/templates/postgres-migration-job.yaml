@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "agentex.fullname" . }}-migrate
+  {{- if .Values.hooks.postgres.enabled }}
+  annotations:
+    "helm.sh/hook": {{ .Values.hooks.migration.hooks }}
+    "helm.sh/hook-weight": "{{ .Values.hooks.migration.weight }}"
+    "helm.sh/hook-delete-policy": {{ .Values.hooks.migration.deletePolicy }}
+  {{- end }}
+spec:
+  template:
+    spec:
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "-c", "cd database/migrations && until pg_isready -h agentex-postgres -p 5432; do echo 'Waiting for PostgreSQL...'; sleep 2; done && alembic upgrade head"]
+          env:
+            - name: DATABASE_URL
+              value: "{{ .Values.environment.DATABASE_URL }}"
+      restartPolicy: OnFailure

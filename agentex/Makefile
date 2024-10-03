@@ -3,52 +3,80 @@
 install:
 	poetry install
 
-# Command to run everything in development mode using Docker Compose
-dev:
-	docker-compose down -v && ENV=development docker-compose up --build
+start-cluster:
+	minikube start
+
+stop-cluster:
+	minikube stop
+
+k9s:
+	k9s
+
+# Set Minikube's Docker environment
+minikube-env:
+	eval $(minikube -p minikube docker-env)
+
+# Command to build images using Minikube's Docker daemon
+build-images: minikube-env
+	# Build agentex-backend image
+	docker build -f Dockerfile -t agentex-backend:latest .
+	# Build temporal-worker image
+	docker build -f Dockerfile.temporal.worker -t agentex-worker:latest .
+
+# Command to deploy using Helm and reset Docker environment
+deploy: build-images
+	helm upgrade --install redis bitnami/redis
+	helm upgrade --install \
+		--repo https://go.temporal.io/helm-charts \
+		--set server.replicaCount=1 \
+		--set cassandra.config.cluster_size=1 \
+		--set elasticsearch.replicas=1 \
+		--set prometheus.enabled=false \
+		--set grafana.enabled=false \
+		temporal temporal \
+		--timeout 15m
+	helm upgrade --install agentex-workers ./charts/agentex-workers --values ./charts/agentex-workers/values.yaml
+	helm upgrade --install agentex ./charts/agentex --values ./charts/agentex/values.yaml
+	eval $(minikube -p minikube docker-env -u)
+
+# Command to run everything in development mode using Minikube
+dev: build-images deploy
 
 # Command to stop and remove all services
-stop:
-	docker-compose down
-
-# Command to clean up services, removing containers, networks, and volumes
-clean:
-	docker-compose down --volumes --remove-orphans
+uninstall:
+	helm uninstall agentex
+	helm uninstall agentex-workers
+	helm uninstall redis
+	helm uninstall temporal
 
 # Command to create a new Alembic migration
-migration:
+migration: build-images
 	@echo "Starting PostgreSQL container..."
-	docker-compose up -d postgres
-	sleep 5 # Wait for PostgreSQL to start
+	# Replace with Minikube specific commands if necessary
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "DROP DATABASE IF EXISTS agentex;"
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "CREATE DATABASE agentex;"
+
 	@echo "Running Alembic migrations..."
-	# Run migrations from the database/migrations folder
-	docker-compose run --rm -e ENV=development -w /app/database/migrations -v $(PWD)/database/migrations:/app/database/migrations agentex-backend alembic upgrade head
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=agentex-backend -o jsonpath='{.items[0].metadata.name}') -- alembic upgrade head
+
 	@echo "Generating new migration..."
 	@if [ -z "$(NAME)" ]; then \
 		echo "Error: NAME is not defined. Please provide a name for the migration."; \
 		exit 1; \
 	fi; \
-	# Generate a new migration from the database/migrations folder
-	docker-compose run --rm -e ENV=development -w /app/database/migrations -v $(PWD)/database/migrations:/app/database/migrations agentex-backend alembic revision --autogenerate -m "$(NAME)"
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=agentex-backend -o jsonpath='{.items[0].metadata.name}') -- alembic revision --autogenerate -m "$(NAME)"
 	@echo "Migration generation completed."
 
-
 clean-db:
-	@echo "Stopping services..."
-	docker-compose down
-	@echo "Starting PostgreSQL container..."
-	docker-compose up -d postgres
-	sleep 5 # Wait for PostgreSQL to start
 	@echo "Dropping and recreating the database..."
-	docker-compose exec postgres psql -U postgres -c "DROP DATABASE IF EXISTS agentex;"
-	docker-compose exec postgres psql -U postgres -c "CREATE DATABASE agentex;"
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "DROP DATABASE IF EXISTS agentex;"
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "CREATE DATABASE agentex;"
 	@echo "Database reset completed."
 
-
-# Command to run in production mode
-prod:
-	ENV=production cargo run
-
-# Command to test (just an example)
+# Command to test
 test:
 	poetry run pytest --cov=agentex
+
+# Reset Docker environment after build (optional)
+reset-docker-env:
+	eval $(minikube -p minikube docker-env -u)
