@@ -25,22 +25,13 @@ build-images: minikube-env
 
 # Command to deploy using Helm and reset Docker environment
 deploy: build-images
-	helm upgrade --install redis bitnami/redis
-	helm upgrade --install \
-		--repo https://go.temporal.io/helm-charts \
-		--set server.replicaCount=1 \
-		--set cassandra.config.cluster_size=1 \
-		--set elasticsearch.replicas=1 \
-		--set prometheus.enabled=false \
-		--set grafana.enabled=false \
-		temporal temporal \
-		--timeout 15m
-	helm upgrade --install agentex-workers ./charts/agentex-workers --values ./charts/agentex-workers/values.yaml
-	helm upgrade --install agentex ./charts/agentex --values ./charts/agentex/values.yaml
+	helmfile -f charts/helmfile.dev.yaml apply
+	cd ..
 	eval $(minikube -p minikube docker-env -u)
 
 # Command to run everything in development mode using Minikube
 dev: build-images deploy
+	kubectl port-forward service/agentex 5003:80
 
 # Command to stop and remove all services
 uninstall:

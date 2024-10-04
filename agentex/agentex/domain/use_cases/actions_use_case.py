@@ -10,6 +10,7 @@ from agentex.adapters.containers.adapter_docker import DDockerGateway
 from agentex.domain.entities.actions import Action
 from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agents.action_repository import DActionRepository
+from agentex.domain.services.agents.action_service import DActionService
 from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.utils.ids import orm_id
 from agentex.utils.json_schema import validate_payload, JSONSchemaValidationError
@@ -38,11 +39,11 @@ class ActionsUseCase:
         self,
         action_repository: DActionRepository,
         agent_repository: DAgentRepository,
-        container_manager: DDockerGateway  # Injecting the Docker container manager
+        action_service: DActionService
     ):
         self.action_repo = action_repository
         self.agent_repo = agent_repository
-        self.container_manager = container_manager
+        self.action_service = action_service
 
     async def create(
         self,
@@ -78,12 +79,19 @@ class ActionsUseCase:
                 raise ActionUnzipError(f"Error extracting zip file: {e}")
 
             # Run Docker container to validate the code package using the gateway
+            image = f"agentex/actions/{name}"
+            docker_image_uri = f"{image}:{version}"
+
             try:
-                docker_image_uri = f"agentex/actions/temp/{name}:latest"
-                await self.container_manager.build_image(path=temp_dir, image_name=docker_image_uri)
-                result = await self.container_manager.run_container(docker_image_uri, test_payload)
-                logger.info(f"Action Test Output: {result}")
-                await self.container_manager.remove_image(docker_image_uri)
+                await self.action_service.build_action(
+                    image=image,
+                    tag=version,
+                    zip_file_path=file_location
+                )
+                # await self.container_manager.build_image(path=temp_dir, image_name=docker_image_uri)
+                # result = await self.container_manager.run_container(docker_image_uri, test_payload)
+                # logger.info(f"Action Test Output: {result}")
+                # await self.container_manager.remove_image(docker_image_uri)
             except Exception as e:
                 raise InvalidActionError(f"Encounter error running action: {e}")
 

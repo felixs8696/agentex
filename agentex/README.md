@@ -8,6 +8,8 @@
 brew install minikube
 brew install derailed/k9s/k9s
 brew install helm
+brew install helmfile
+helm plugin install https://github.com/databus23/helm-diff
 
 conda create -n agentex python=3.12
 conda activate agentex
@@ -38,6 +40,7 @@ helm upgrade --install \
     --set grafana.enabled=false \
     temporal temporal \
     --timeout 15m
+helm upgrade --install harbor harbor/harbor --namespace harbor -f charts/harbor/values.yaml
 ```
 
 ### Redis

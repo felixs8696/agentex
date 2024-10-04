@@ -1,11 +1,9 @@
 import asyncio
 from typing import Annotated, Optional
 
-import aiodocker
-import docker
-from aiodocker import Docker
 from docker import DockerClient
 from fastapi import Depends
+from kubernetes_asyncio import config as k8s_config
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, AsyncEngine, create_async_engine
 from temporalio.client import Client as TemporalClient
 
@@ -56,7 +54,7 @@ class GlobalDependencies(metaclass=Singleton):
             logger.error(f"Failed to initialize temporal client: {e}")
             self.temporal_client = None
 
-        self.docker_client = docker.from_env()
+        self.docker_client = None
 
         echo_db_engine = self.environment_variables.ENV == Environment.DEV
         async_db_pool_size = 10
@@ -71,6 +69,9 @@ class GlobalDependencies(metaclass=Singleton):
             pool_size=async_db_pool_size,
             pool_pre_ping=True,
         )
+
+        # Load Kubernetes configuration (local or in-cluster)
+        k8s_config.load_incluster_config()
 
         # self.database_async_read_only_engine = create_async_engine(
         #     "postgresql+asyncpg://",
