@@ -26,7 +26,6 @@ build-images: minikube-env
 # Command to deploy using Helm and reset Docker environment
 deploy: build-images
 	helmfile -f charts/helmfile.dev.yaml apply
-	cd ..
 	eval $(minikube -p minikube docker-env -u)
 
 # Command to run everything in development mode using Minikube

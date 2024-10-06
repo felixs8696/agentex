@@ -36,6 +36,15 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ENV
+              value: {{ .Values.environment.ENV }}
+            - name: DATABASE_URL
+              value: {{ .Values.environment.DATABASE_URL }}
+            - name: TEMPORAL_ADDRESS
+              value: {{ .Values.environment.TEMPORAL_URL }}
+            - name: REDIS_URL
+              value: {{ .Values.environment.REDIS_URL }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

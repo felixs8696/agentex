@@ -23,6 +23,12 @@ make install
 
 ### Run the server
 
+# In one terminal
+```commandline
+minikube mount $(pwd):/mnt/host/agentex
+```
+
+# In another terminal
 ```commandline
 make dev
 ```
@@ -42,6 +48,15 @@ helm upgrade --install \
     --timeout 15m
 helm upgrade --install harbor harbor/harbor --namespace harbor -f charts/harbor/values.yaml
 ```
+
+### Harbor Registry
+
+```commandline
+kubectl port-forward svc/harbor 8443:443 --namespace harbor
+```
+* Visit: https://127.0.0.1:8443
+* Enter username and password.
+
 
 ### Redis
 

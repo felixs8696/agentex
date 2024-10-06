@@ -1,3 +1,4 @@
+import os
 import uuid
 from typing import Annotated
 
@@ -16,9 +17,9 @@ class KanikoBuildGateway(ContainerBuildGateway):
         environment_variables: DEnvironmentVariables,
     ):
         self.k8s = kubernetes_gateway
-        self.registry_url = environment_variables.IMAGE_REGISTRY_URL
         self.build_contexts_path = environment_variables.BUILD_CONTEXTS_PATH
         self.build_context_pvc_name = environment_variables.BUILD_CONTEXT_PVC_NAME
+        self.build_registry_secret_name = environment_variables.BUILD_REGISTRY_SECRET_NAME
 
     @staticmethod
     def _uid():
@@ -33,7 +34,8 @@ class KanikoBuildGateway(ContainerBuildGateway):
         registry_url: str,
     ):
         unique_id = self._uid()
-        job_name = f"build-{image}-{tag}-{unique_id}"
+        _image = image.replace('/', '-').replace('_', '-').lower()
+        job_name = f"build-{_image}-{tag}-{unique_id}"
 
         # Create the Kaniko Job spec
         job = client.V1Job(
@@ -47,15 +49,33 @@ class KanikoBuildGateway(ContainerBuildGateway):
                             client.V1Container(
                                 name="kaniko",
                                 image="gcr.io/kaniko-project/executor:latest",
+                                image_pull_policy="IfNotPresent",
                                 args=[
-                                    f"--context=tar:///mnt/{zip_file_path}",  # Use tar if you compress the zip
+                                    f"--context=tar://{zip_file_path}",  # Use tar if you compress the zip
                                     "--dockerfile=Dockerfile",  # Adjust based on your file structure
                                     f"--destination={registry_url}/{image}:{tag}",
                                 ],
+                                env=[
+                                    client.V1EnvVar(
+                                        name="DOCKER_CONFIG",
+                                        value="/kaniko/.docker"
+                                    )
+                                ],
+                                lifecycle=client.V1Lifecycle(
+                                    pre_stop=client.V1LifecycleHandler(
+                                        _exec=client.V1ExecAction(
+                                            command=["sh", "-c", f"rm -f {zip_file_path}"]
+                                        )
+                                    )
+                                ),
                                 volume_mounts=[
                                     client.V1VolumeMount(
                                         name=self.build_context_pvc_name,  # Mount the existing PVC
                                         mount_path=self.build_contexts_path  # Mount the PVC where the zip is located
+                                    ),
+                                    client.V1VolumeMount(
+                                        name="build-registry-secret",  # Mount the existing PVC
+                                        mount_path="/kaniko/.docker"  # Mount the PVC where the zip is located
                                     ),
                                 ]
                             )
@@ -66,6 +86,12 @@ class KanikoBuildGateway(ContainerBuildGateway):
                                 name=self.build_context_pvc_name,
                                 persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
                                     claim_name=self.build_context_pvc_name,
+                                ),
+                            ),
+                            client.V1Volume(
+                                name="build-registry-secret",
+                                secret=client.V1SecretVolumeSource(
+                                    secret_name=self.build_registry_secret_name,
                                 ),
                             ),
                         ],

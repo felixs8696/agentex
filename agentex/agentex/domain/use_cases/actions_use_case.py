@@ -1,4 +1,5 @@
 import shutil
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
@@ -7,6 +8,7 @@ from typing import Optional, List, Annotated, Dict, Any
 from fastapi import Depends, UploadFile
 
 from agentex.adapters.containers.adapter_docker import DDockerGateway
+from agentex.config.dependencies import DEnvironmentVariables
 from agentex.domain.entities.actions import Action
 from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agents.action_repository import DActionRepository
@@ -39,11 +41,13 @@ class ActionsUseCase:
         self,
         action_repository: DActionRepository,
         agent_repository: DAgentRepository,
-        action_service: DActionService
+        action_service: DActionService,
+        environment_variables: DEnvironmentVariables,
     ):
         self.action_repo = action_repository
         self.agent_repo = agent_repository
         self.action_service = action_service
+        self.build_contexts_path = environment_variables.BUILD_CONTEXTS_PATH
 
     async def create(
         self,
@@ -60,8 +64,8 @@ class ActionsUseCase:
         except JSONSchemaValidationError as error:
             raise ClientError(f"Test payload does not match parameters schema: {error}") from error
 
-        # Create a temporary directory for extracting the zip file
-        with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a temporary directory in the self.build_contexts_path directory
+        with tempfile.TemporaryDirectory(dir=self.build_contexts_path, delete=False) as temp_dir:
             # Save the uploaded zip file locally
             file_location = Path(temp_dir) / code_package.filename
 
@@ -70,30 +74,28 @@ class ActionsUseCase:
 
             # Extract the zip file
             try:
-                with zipfile.ZipFile(file_location, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
-                    # List the contents of the extracted zip file
-                    extracted_files = zip_ref.namelist()  # Get list of file names in the zip
+                with tarfile.open(file_location, 'r:gz') as tar_ref:
+                    tar_ref.extractall(path=temp_dir)  # Extract to the temporary directory
+
+                    # List the contents of the extracted tar.gz file
+                    extracted_files = [member.name for member in tar_ref.getmembers()]  # Get list of file names
                     logger.info(f"Extracted files: {extracted_files}")
             except Exception as e:
                 raise ActionUnzipError(f"Error extracting zip file: {e}")
 
             # Run Docker container to validate the code package using the gateway
-            image = f"agentex/actions/{name}"
+            image = name
             docker_image_uri = f"{image}:{version}"
 
-            try:
-                await self.action_service.build_action(
-                    image=image,
-                    tag=version,
-                    zip_file_path=file_location
-                )
-                # await self.container_manager.build_image(path=temp_dir, image_name=docker_image_uri)
-                # result = await self.container_manager.run_container(docker_image_uri, test_payload)
-                # logger.info(f"Action Test Output: {result}")
-                # await self.container_manager.remove_image(docker_image_uri)
-            except Exception as e:
-                raise InvalidActionError(f"Encounter error running action: {e}")
+            await self.action_service.build_action(
+                image=image,
+                tag=version,
+                zip_file_path=file_location.absolute()
+            )
+            # await self.container_manager.build_image(path=temp_dir, image_name=docker_image_uri)
+            # result = await self.container_manager.run_container(docker_image_uri, test_payload)
+            # logger.info(f"Action Test Output: {result}")
+            # await self.container_manager.remove_image(docker_image_uri)
 
             action = await self.action_repo.create(
                 item=Action(

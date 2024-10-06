@@ -121,3 +121,11 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+environment:
+  ENV: "development"
+  DATABASE_URL: "postgres://postgres:postgres@agentex-postgres:5432/agentex"
+  TEMPORAL_URL: "temporal-frontend:7233"
+  REDIS_URL: "redis://redis-master:6379"
+  BUILD_CONTEXTS_PATH: "/mnt/build-contexts"
+  BUILD_CONTEXT_PVC_NAME: "build-context-pvc"

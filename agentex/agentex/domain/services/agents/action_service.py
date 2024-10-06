@@ -4,7 +4,7 @@ from fastapi import Depends
 
 from agentex.adapters.containers.build_adapter_kaniko import DKanikoBuildGateway
 from agentex.adapters.kubernetes.adapter_kubernetes import DKubernetesGateway
-from agentex.config.environment_variables import EnvironmentVariables
+from agentex.config.dependencies import DEnvironmentVariables
 
 
 class ActionService:
@@ -12,9 +12,9 @@ class ActionService:
         self,
         build_gateway: DKanikoBuildGateway,
         kubernetes_gateway: DKubernetesGateway,
-        environment_variables: EnvironmentVariables
+        environment_variables: DEnvironmentVariables
     ):
-        self.build_namespace = "agentex-builds"
+        self.build_namespace = "default"
         self.k8s = kubernetes_gateway
         self.build_gateway = build_gateway
         self.registry_url = environment_variables.BUILD_REGISTRY_URL

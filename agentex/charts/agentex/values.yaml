@@ -110,12 +110,22 @@ volumes:
   - name: build-context-pvc
     persistentVolumeClaim:
       claimName: build-context-pvc  # Name of the PVC defined in your templates
+  - name: build-registry-secret
+    secret:
+      defaultMode: 420
+      secretName: build-registry-creds
+#  - name: project-directory
+#    hostPath:
+#      path: /mnt/host/agentex  # Change this to your actual current directory path
+#      type: Directory
 
 # Additional volumeMounts on the output Deployment definition.
 # Mount the PVC to the desired path in the container
 volumeMounts:
   - name: build-context-pvc
     mountPath: /mnt/build-contexts  # Path inside the container where the PVC is mounted
+  - name: build-registry-secret
+    mountPath: /root/.docker  # Path inside the container where the Docker registry credentials are mounted
 
 nodeSelector: {}
 
@@ -123,13 +133,24 @@ tolerations: []
 
 affinity: {}
 
+#backend:
+#  command:
+#    - "uvicorn"
+#    - "agentex.api.app:app"
+#    - "--host"
+#    - "0.0.0.0"
+#    - "--port"
+#    - "{{ .Values.service.containerPort }}"
+#    - "--reload"
+
 environment:
   ENV: "development"
   DATABASE_URL: "postgres://postgres:postgres@agentex-postgres:5432/agentex"
   TEMPORAL_URL: "temporal-frontend:7233"
-  REDIS_URL: "redis-master:6379"
+  REDIS_URL: "redis://redis-master:6379"
   BUILD_CONTEXTS_PATH: "/mnt/build-contexts"
   BUILD_CONTEXT_PVC_NAME: "build-context-pvc"
+  BUILD_REGISTRY_URL: "harbor.harbor.svc.cluster.local:80/agentex-test"
 
 # PostgreSQL configuration
 postgres:
@@ -168,3 +189,6 @@ buildContexts:
     resources:
       requests:
         storage: 10Gi  # Adjust based on your needs
+
+buildRegistry:
+  secretName: build-registry-creds

@@ -28,7 +28,7 @@ releases:
           type: clusterIP
           tls:
             enabled: false
-        externalURL: "http://harbor.harbor.svc.cluster.local"
+        externalURL: "http://harbor.harbor.svc.cluster.local:80"
         persistence:
           enabled: true
           persistentVolumeClaim:
