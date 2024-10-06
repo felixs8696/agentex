@@ -13,5 +13,5 @@ spec:
       port: {{ .Values.postgres.service.port }}
       targetPort: {{ .Values.postgres.service.port }}
   selector:
-    app: {{ include "agentex.name" . }}
+    app: {{ include "agentex.name" . }}-postgres
     component: postgres

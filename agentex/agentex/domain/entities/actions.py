@@ -1,13 +1,23 @@
+from datetime import datetime
 from enum import Enum
 from typing import Dict, Any, Optional
 
 from pydantic import Field
 
+from agentex.domain.entities.job import Job
 from agentex.utils.model_utils import BaseModel
 
 
 class PackagingMethod(str, Enum):
     DOCKER = "docker"
+
+
+class ActionStatus(str, Enum):
+    PENDING = "PENDING"
+    BUILDING = "Building"
+    READY = "Ready"
+    FAILED = "Failed"
+    UNKNOWN = "Unknown"
 
 
 class Action(BaseModel):
@@ -44,4 +54,15 @@ class Action(BaseModel):
         None,
         description="The URI of the image associated with the action. Only set if the packaging method is `docker`."
     )
-
+    status: ActionStatus = Field(
+        ActionStatus.UNKNOWN,
+        description="The status of the action, indicating if it's building, ready, failed, etc."
+    )
+    build_job_name: Optional[str] = Field(
+        None,
+        description="The name of the build job that is building the action."
+    )
+    build_job_namespace: Optional[str] = Field(
+        "default",
+        description="The namespace that the build job is running in."
+    )

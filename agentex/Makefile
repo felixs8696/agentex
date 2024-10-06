@@ -40,22 +40,30 @@ uninstall:
 	helm uninstall temporal
 
 # Command to create a new Alembic migration
-migration: build-images
-	@echo "Starting PostgreSQL container..."
-	# Replace with Minikube specific commands if necessary
-	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "DROP DATABASE IF EXISTS agentex;"
-	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "CREATE DATABASE agentex;"
+# Command to create a new Alembic migration
+migration:
+	@echo "Starting PostgreSQL migration process..."
 
-	@echo "Running Alembic migrations..."
-	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=agentex-backend -o jsonpath='{.items[0].metadata.name}') -- alembic upgrade head
-
-	@echo "Generating new migration..."
+	# Check if a migration name (NAME) is provided
 	@if [ -z "$(NAME)" ]; then \
 		echo "Error: NAME is not defined. Please provide a name for the migration."; \
 		exit 1; \
-	fi; \
-	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=agentex-backend -o jsonpath='{.items[0].metadata.name}') -- alembic revision --autogenerate -m "$(NAME)"
-	@echo "Migration generation completed."
+	fi
+
+	@echo "Running Alembic upgrade to the latest version in the agentex pod..."
+	# Upgrade the database schema to the latest version inside the Kubernetes cluster
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}') -- sh -c "cd /app/database/migrations && alembic upgrade head"
+
+	@echo "Generating a new Alembic migration inside the agentex pod..."
+	# Generate the migration inside the pod, using the PostgreSQL database
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}') -- sh -c "cd /app/database/migrations && alembic revision --autogenerate -m '$(NAME)'"
+
+	@echo "Copying the generated migration file to the local project..."
+	# Copy the generated migration file from the pod to your local directory
+	POD_MIGRATION_FILE=$$(minikube kubectl -- exec $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}') -- sh -c "ls /app/database/migrations/alembic/versions/*.py | sort | tail -n 1"); \
+	minikube kubectl cp $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}'):/app/database/migrations/alembic/versions/$$POD_MIGRATION_FILE ./database/migrations/alembic/versions/
+
+	@echo "Migration generation completed and copied to the local machine."
 
 clean-db:
 	@echo "Dropping and recreating the database..."

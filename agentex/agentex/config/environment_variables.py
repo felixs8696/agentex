@@ -40,8 +40,8 @@ class EnvironmentVariables(BaseModel):
     DATABASE_URL: Optional[str]
     TEMPORAL_ADDRESS: Optional[str]
     REDIS_URL: Optional[str]
-    TEMPORAL_WORKER_ACTIVITY_THREAD_POOL_SIZE: int = 16  # Default 16 for local dev
-    TEMPORAL_WORKER_MAX_ACTIVITIES_PER_WORKER: int = 1000  # Default 1000 for local dev
+    TEMPORAL_WORKER_ACTIVITY_THREAD_POOL_SIZE: int = 4  # Default 4 for local dev
+    TEMPORAL_WORKER_MAX_ACTIVITIES_PER_WORKER: int = 10  # Default 10 for local dev
     BUILD_REGISTRY_URL: Optional[str] = None
     BUILD_CONTEXTS_PATH: Optional[str] = None
     BUILD_CONTEXT_PVC_NAME: Optional[str] = None

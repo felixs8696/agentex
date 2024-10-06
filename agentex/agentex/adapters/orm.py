@@ -1,4 +1,6 @@
-from sqlalchemy import Column, String, ForeignKey, Table, Enum as SQLAlchemyEnum, Text, UniqueConstraint
+from datetime import datetime, UTC
+
+from sqlalchemy import DateTime, Column, String, ForeignKey, Table, Enum as SQLAlchemyEnum, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -21,6 +23,8 @@ class AgentORM(BaseORM):
     id = Column(String, primary_key=True, default=orm_id)  # Using UUIDs for IDs
     name = Column(String, unique=True, nullable=False, index=True)
     actions = relationship('ActionORM', secondary=agent_action_association, back_populates='agents')
+    created_at = Column(DateTime, default=datetime.now(UTC))
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
 
 class TaskORM(BaseORM):
@@ -29,6 +33,8 @@ class TaskORM(BaseORM):
     agent_id = Column(String, ForeignKey('agents.id'), nullable=False)
     prompt = Column(String, nullable=False)
     agent = relationship("AgentORM")
+    created_at = Column(DateTime, default=datetime.now(UTC))
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
 
 class ActionORM(BaseORM):
@@ -42,6 +48,11 @@ class ActionORM(BaseORM):
     test_payload = Column(JSONB, nullable=False)
     docker_image = Column(String, nullable=True)
     agents = relationship('AgentORM', secondary=agent_action_association, back_populates='actions')
+    # Reference to Kubernetes job (by job name and namespace)
+    build_job_name = Column(String, nullable=True, index=True)
+    build_job_namespace = Column(String, default="default", nullable=True)
+    created_at = Column(DateTime, default=datetime.now(UTC))
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     __table_args__ = (
         UniqueConstraint('version', name='uq_version'),  # Add unique constraint on version

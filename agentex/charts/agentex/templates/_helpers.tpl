@@ -50,6 +50,22 @@ app.kubernetes.io/name: {{ include "agentex.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/* Postgres labels */}}
+{{- define "agentex.postgres.labels" -}}
+helm.sh/chart: {{ include "agentex.chart" . }}
+{{ include "agentex.postgres.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/* Postgres selector labels */}}
+{{- define "agentex.postgres.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "agentex.name" . }}-postgres
+app.kubernetes.io/instance: {{ .Release.Name }}-postgres
+{{- end }}
+
 {{/*
 Create the name of the service account to use
 */}}

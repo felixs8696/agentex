@@ -58,6 +58,16 @@ kubectl port-forward svc/harbor 8443:443 --namespace harbor
 * Enter username and password.
 
 
+### Temporal
+
+One time setup (See: https://github.com/temporalio/helm-charts?tab=readme-ov-file#running-temporal-cli-from-the-admin-tools-container)
+```commandline
+kubectl exec -it services/temporaltest-admintools /bin/bash
+tctl --ns default namespace desc  # if not found
+tctl --ns default namespace re
+```
+
+
 ### Redis
 
 ```commandline

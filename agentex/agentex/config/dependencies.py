@@ -43,7 +43,9 @@ class GlobalDependencies(metaclass=Singleton):
         ]:
             return None
         else:
-            return await TemporalClient.connect(self.environment_variables.TEMPORAL_ADDRESS)
+            return await TemporalClient.connect(
+                self.environment_variables.TEMPORAL_ADDRESS
+            )
 
     async def load(self):
         self.environment_variables = EnvironmentVariables.refresh()

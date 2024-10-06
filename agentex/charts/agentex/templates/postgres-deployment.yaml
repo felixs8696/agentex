@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: {{ include "agentex.fullname" . }}-postgres
   labels:
-    {{- include "agentex.labels" . | nindent 4 }}
+    {{- include "agentex.postgres.labels" . | nindent 4 }}
   {{- if .Values.hooks.postgres.enabled }}
   annotations:
     "helm.sh/hook": {{ .Values.hooks.postgres.hooks }}
@@ -13,12 +13,12 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "agentex.name" . }}
+      app: {{ include "agentex.name" . }}-postgres
       component: postgres
   template:
     metadata:
       labels:
-        app: {{ include "agentex.name" . }}
+        app: {{ include "agentex.name" . }}-postgres
         component: postgres
     spec:
       containers:

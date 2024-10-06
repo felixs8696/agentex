@@ -154,6 +154,11 @@ environment:
 
 # PostgreSQL configuration
 postgres:
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: agentex
+    app.kubernetes.io/version: 1.16.0
+    app.kubernetes.io/managed-by: Helm
   image:
     repository: postgres
     tag: "17"
