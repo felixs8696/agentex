@@ -68,12 +68,10 @@ class ActionService:
         job_namespace = action.build_job_namespace
         return await self.k8s.get_job(namespace=job_namespace, name=job_name)
 
-    async def update_action_status(
+    async def update_action(
         self,
-        action: Action,
-        status: ActionStatus
+        action: Action
     ) -> Action:
-        action.status = status
         return await self.action_repo.update(item=action)
 
 

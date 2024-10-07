@@ -104,9 +104,9 @@ class PostgresCRUDRepository(CRUDRepository[T], Generic[M, T]):
     async def update(self, item: T) -> T:
         async with self.start_async_db_session(True) as session, async_sql_exception_handler():
             orm = self.orm(**item.to_dict())
-            session.merge(orm)
+            modified_orm = await session.merge(orm)
             await session.commit()
-            return self.entity.from_orm(orm)
+            return self.entity.from_orm(modified_orm)
 
     async def batch_update(self, items: List[T]) -> List[T]:
         async with self.start_async_db_session(True) as session, async_sql_exception_handler():

@@ -129,3 +129,5 @@ environment:
   REDIS_URL: "redis://redis-master:6379"
   BUILD_CONTEXTS_PATH: "/mnt/build-contexts"
   BUILD_CONTEXT_PVC_NAME: "build-context-pvc"
+  BUILD_REGISTRY_URL: "harbor.harbor.svc.cluster.local:80/agentex-test"
+  BUILD_REGISTRY_SECRET_NAME: "build-registry-creds"

@@ -6,10 +6,15 @@ from aiohttp import web
 from temporalio.client import Client as TemporalClient
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
+from agentex.adapters.containers.build_adapter_kaniko import KanikoBuildGateway
+from agentex.adapters.kubernetes.adapter_kubernetes import KubernetesGateway
 from agentex.adapters.kv_store.adapter_redis import RedisRepository
 from agentex.adapters.llm.adapter_litellm import LiteLLMGateway
-from agentex.config.dependencies import GlobalDependencies
+from agentex.config.dependencies import GlobalDependencies, database_async_read_write_session_maker
 from agentex.config.environment_variables import EnvironmentVariables
+from agentex.domain.services.agents.action_repository import ActionRepository
+from agentex.domain.services.agents.action_service import ActionService
+from agentex.domain.services.agents.agent_repository import AgentRepository
 from agentex.domain.services.agents.agent_state_repository import AgentStateRepository
 from agentex.domain.services.agents.agent_state_service import AgentStateService
 from agentex.domain.workflows.agent_task_workflow import AgentTaskWorkflow, AgentTaskActivities
@@ -46,6 +51,7 @@ async def health_check(health_status: OverallHealthStatus):
 
 async def run_agent_task_worker(
     temporal_client: TemporalClient,
+    global_dependencies: GlobalDependencies,
     environment_variables: EnvironmentVariables,
     health_status: OverallHealthStatus,
     task_queue=AGENT_TASK_TASK_QUEUE,
@@ -97,28 +103,37 @@ async def run_agent_task_worker(
 
 async def run_create_action_worker(
     temporal_client: TemporalClient,
+    global_dependencies: GlobalDependencies,
     environment_variables: EnvironmentVariables,
     health_status: OverallHealthStatus,
     task_queue=BUILD_ACTION_TASK_QUEUE,
 ):
     try:
+        async_read_write_session_maker = database_async_read_write_session_maker(
+            db_async_read_write_engine=global_dependencies.database_async_read_write_engine,
+        )
+        action_repository = ActionRepository(
+            async_read_write_session_maker=async_read_write_session_maker,
+        )
+        agent_repository = AgentRepository(
+            async_read_write_session_maker=async_read_write_session_maker,
+            action_repository=action_repository,
+        )
+        k8s_gateway = KubernetesGateway()
+        build_gateway = KanikoBuildGateway(
+            kubernetes_gateway=k8s_gateway,
+            environment_variables=environment_variables,
+        )
+
         create_action_activities = CreateActionActivities(
-            action_repository=AgentStateRepository(
-                memory_repo=RedisRepository(
-                    environment_variables=environment_variables,
-                )
-            ),
-            agent_repository=AgentStateRepository(
-                memory_repo=RedisRepository(
-                    environment_variables=environment_variables,
-                )
-            ),
-            action_service=AgentStateService(
-                repository=AgentStateRepository(
-                    memory_repo=RedisRepository(
-                        environment_variables=environment_variables,
-                    )
-                )
+            action_repository=action_repository,
+            agent_repository=agent_repository,
+            action_service=ActionService(
+                build_gateway=build_gateway,
+                action_repository=action_repository,
+                agent_repository=agent_repository,
+                kubernetes_gateway=k8s_gateway,
+                environment_variables=environment_variables,
             ),
             environment_variables=environment_variables,
         )
@@ -136,7 +151,8 @@ async def run_create_action_worker(
             activities=[
                 create_action_activities.create_action,
                 create_action_activities.build_action,
-                create_action_activities.get_build_job,
+                create_action_activities.get_action_build_job,
+                create_action_activities.update_action_with_build_info,
                 create_action_activities.update_action_status,
             ],
             workflow_runner=UnsandboxedWorkflowRunner(),
@@ -167,11 +183,13 @@ async def run_workers(health_status: OverallHealthStatus):
     await asyncio.gather(
         run_agent_task_worker(
             temporal_client=client,
+            global_dependencies=global_dependencies,
             environment_variables=environment_variables,
             health_status=health_status
         ),
         run_create_action_worker(
             temporal_client=client,
+            global_dependencies=global_dependencies,
             environment_variables=environment_variables,
             health_status=health_status
         ),

@@ -1,11 +1,11 @@
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timezone
 
 from sqlalchemy import DateTime, Column, String, ForeignKey, Table, Enum as SQLAlchemyEnum, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-from agentex.domain.entities.actions import PackagingMethod
+from agentex.domain.entities.actions import PackagingMethod, ActionStatus
 from agentex.utils.ids import orm_id
 
 BaseORM = declarative_base()
@@ -23,8 +23,8 @@ class AgentORM(BaseORM):
     id = Column(String, primary_key=True, default=orm_id)  # Using UUIDs for IDs
     name = Column(String, unique=True, nullable=False, index=True)
     actions = relationship('ActionORM', secondary=agent_action_association, back_populates='agents')
-    created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
 
 class TaskORM(BaseORM):
@@ -33,8 +33,8 @@ class TaskORM(BaseORM):
     agent_id = Column(String, ForeignKey('agents.id'), nullable=False)
     prompt = Column(String, nullable=False)
     agent = relationship("AgentORM")
-    created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
 
 class ActionORM(BaseORM):
@@ -49,10 +49,11 @@ class ActionORM(BaseORM):
     docker_image = Column(String, nullable=True)
     agents = relationship('AgentORM', secondary=agent_action_association, back_populates='actions')
     # Reference to Kubernetes job (by job name and namespace)
+    status = Column(SQLAlchemyEnum(ActionStatus), nullable=False)
     build_job_name = Column(String, nullable=True, index=True)
     build_job_namespace = Column(String, default="default", nullable=True)
-    created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint('version', name='uq_version'),  # Add unique constraint on version

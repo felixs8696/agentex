@@ -7,6 +7,9 @@ subjects:
 - kind: ServiceAccount
   name: agentex
   namespace: default
+- kind: ServiceAccount
+  name: agentex-workers
+  namespace: default
 roleRef:
   kind: Role
   name: agentex-builds-role

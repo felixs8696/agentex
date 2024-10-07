@@ -31,6 +31,7 @@ minikube mount $(pwd):/mnt/host/agentex
 # In another terminal
 ```commandline
 make dev
+kubectl port-forward service/agentex 5003:80 # If the port forwarding is attempted before the pod is ready
 ```
 
 ### Helm Charts

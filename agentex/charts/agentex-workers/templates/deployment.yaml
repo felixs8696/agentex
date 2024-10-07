@@ -45,6 +45,14 @@ spec:
               value: {{ .Values.environment.TEMPORAL_URL }}
             - name: REDIS_URL
               value: {{ .Values.environment.REDIS_URL }}
+            - name: BUILD_CONTEXTS_PATH
+              value: {{ .Values.environment.BUILD_CONTEXTS_PATH }}
+            - name: BUILD_CONTEXT_PVC_NAME
+              value: {{ .Values.environment.BUILD_CONTEXT_PVC_NAME }}
+            - name: BUILD_REGISTRY_URL
+              value: {{ .Values.environment.BUILD_REGISTRY_URL }}
+            - name: BUILD_REGISTRY_SECRET_NAME
+              value: {{ .Values.environment.BUILD_REGISTRY_SECRET_NAME }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

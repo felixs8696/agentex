@@ -93,11 +93,6 @@ class ActionsUseCase:
             image = name
             docker_image_uri = f"{image}:{version}"
 
-            await self.action_service.build_action(
-                image=image,
-                tag=version,
-                zip_file_path=file_location.absolute()
-            )
             # await self.container_manager.build_image(path=temp_dir, image_name=docker_image_uri)
             # result = await self.container_manager.run_container(docker_image_uri, test_payload)
             # logger.info(f"Action Test Output: {result}")
@@ -115,6 +110,15 @@ class ActionsUseCase:
                 build_job_name=None,
                 build_job_namespace=None,
             )
+
+            action = await self.action_repo.create(item=action)
+
+            if agents:
+                logger.info("Associating agents with action")
+                await self.agent_repo.associate_agents_with_actions(
+                    agent_names=agents,
+                    action_ids=[action.id]
+                )
 
             await self._start_create_action_workflow(
                 action=action,
@@ -143,13 +147,13 @@ class ActionsUseCase:
             task_queue=self.task_queue,
         )
 
-    async def get(self, id: Optional[str], name: Optional[str]) -> Action:
+    async def get(self, id: Optional[str] = None, name: Optional[str] = None) -> Action:
         return await self.action_repo.get(id=id, name=name)
 
     async def update(self, action: Action) -> Action:
         return await self.action_repo.update(item=action)
 
-    async def delete(self, id: Optional[str], name: Optional[str]) -> Action:
+    async def delete(self, id: Optional[str] = None, name: Optional[str] = None) -> Action:
         return await self.action_repo.delete(id=id, name=name)
 
     async def list(self) -> List[Action]:

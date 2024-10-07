@@ -5,7 +5,7 @@ from kubernetes_asyncio import client
 from kubernetes_asyncio.client import V1Job, ApiClient
 
 from agentex.adapters.kubernetes.port import KubernetesPort
-from agentex.domain.entities.job import Job, JobStatus
+from agentex.domain.entities.job import Job, JobStatus, JobCondition
 
 
 class KubernetesGateway(KubernetesPort):
@@ -41,14 +41,12 @@ class KubernetesGateway(KubernetesPort):
             status = JobStatus.PENDING if job_status.start_time is None else JobStatus.UNKNOWN
 
         return Job(
-            job_name=job.metadata.name,
+            name=job.metadata.name,
             namespace=job.metadata.namespace,
-            start_time=job_status.start_time.isoformat() if job_status.start_time else None,
-            completion_time=job_status.completion_time.isoformat() if job_status.completion_time else None,
+            started_at=job_status.start_time.isoformat() if job_status.start_time else None,
+            completed_at=job_status.completion_time.isoformat() if job_status.completion_time else None,
             status=status,
-            active_pods=job_status.active or 0,
-            succeeded_pods=job_status.succeeded or 0,
-            failed_pods=job_status.failed or 0
+            conditions=[JobCondition(**condition.to_dict()) for condition in (job_status.conditions or [])]
         )
 
 

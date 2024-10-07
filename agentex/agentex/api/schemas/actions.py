@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Optional
 
 from pydantic import Field, model_validator
 
+from agentex.domain.entities.actions import ActionStatus
 from agentex.utils.model_utils import BaseModel
 
 
@@ -64,6 +65,10 @@ class GetActionResponse(BaseModel):
     version: str = Field(
         ...,
         description="The version of the action."
+    )
+    status: ActionStatus = Field(
+        ...,
+        description="The status of the action."
     )
 
 

@@ -1,10 +1,8 @@
-from datetime import datetime
 from enum import Enum
 from typing import Dict, Any, Optional
 
 from pydantic import Field
 
-from agentex.domain.entities.job import Job
 from agentex.utils.model_utils import BaseModel
 
 
@@ -13,7 +11,7 @@ class PackagingMethod(str, Enum):
 
 
 class ActionStatus(str, Enum):
-    PENDING = "PENDING"
+    PENDING = "Pending"
     BUILDING = "Building"
     READY = "Ready"
     FAILED = "Failed"

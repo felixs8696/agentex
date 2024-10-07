@@ -1,6 +1,6 @@
 import asyncio
 from datetime import timedelta
-from typing import List
+from typing import List, Dict
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -29,9 +29,13 @@ class CreateActionParams(BaseModel):
     agents: List[str]
 
 
+class UpdateActionWithBuildInfoParams(BaseModel):
+    action: Action
+    job_dict: Dict
+
+
 class BuildActionParams(BaseModel):
-    image: str
-    tag: str
+    action: Action
     zip_file_path: str
 
 
@@ -55,41 +59,61 @@ class CreateActionActivities:
         self.build_contexts_path = environment_variables.BUILD_CONTEXTS_PATH
 
     @activity.defn(name="create_action")
-    async def create_action(self, action: Action, agents: List[str]):
-        return await self.action_service.create_action(action=action, agents=agents)
+    async def create_action(self, params: CreateActionParams) -> Action:
+        return await self.action_service.create_action(
+            action=params.action,
+            agents=params.agents
+        )
 
     @activity.defn(name="start_action_build")
     async def build_action(
         self,
-        image: str,
-        tag: str,
-        zip_file_path: str,
-    ) -> Job:
-        return await self.action_service.build_action(
+        params: BuildActionParams,
+    ) -> Dict:
+        image = params.action.name
+        tag = params.action.version
+
+        job = await self.action_service.build_action(
             image=image,
             tag=tag,
-            zip_file_path=zip_file_path
+            zip_file_path=params.zip_file_path
         )
 
+        return job.to_dict(mode='json')
+
+    @activity.defn(name="update_action_with_build_info")
+    async def update_action_with_build_info(
+        self,
+        params: UpdateActionWithBuildInfoParams,
+    ) -> Action:
+        action = params.action
+        job_dict = params.job_dict
+
+        job = Job.from_dict(job_dict)
+
+        action.status = ActionStatus.BUILDING
+        action.build_job_name = job.name
+        action.build_job_namespace = job.namespace
+        return await self.action_service.update_action(action=action)
+
     @activity.defn(name="get_action_build_job")
-    async def get_build_job(
+    async def get_action_build_job(
         self,
         action: Action,
-    ) -> Job:
-        return await self.action_service.get_action_build_job(
+    ) -> Dict:
+        job = await self.action_service.get_action_build_job(
             action=action,
         )
+        return job.to_dict(mode='json')
 
     @activity.defn(name="update_action_status")
     async def update_action_status(
         self,
-        action: Action,
-        status: ActionStatus,
+        params: UpdateActionStatusParams,
     ) -> Action:
-        return await self.action_service.update_action_status(
-            action=action,
-            status=status,
-        )
+        action = params.action
+        action.status = params.status
+        return await self.action_service.update_action(action=action)
 
 
 @workflow.defn
@@ -97,54 +121,46 @@ class CreateActionWorkflow:
 
     @workflow.run
     async def run(self, params: CreateActionWorkflowParams):
-        action = await workflow.execute_activity(
-            activity="create_action",
-            arg=CreateActionParams(
-                action=params.action,
-                agents=params.agents,
-            ),
-            start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )
-
-        workflow.logger.info(f"Action created: {action}")
+        action = params.action
 
         # Start the action build
-        job = await workflow.execute_activity(
+        job_dict = await workflow.execute_activity(
             activity="start_action_build",
             arg=BuildActionParams(
-                image=action.name,
-                tag=action.version,
+                action=action,
                 zip_file_path=params.action_tar_path,
             ),
             start_to_close_timeout=timedelta(seconds=60),
-            retry_policy=RetryPolicy(maximum_attempts=3),
+            retry_policy=RetryPolicy(maximum_attempts=0),
         )
 
-        workflow.logger.info(f"Action build job started: {job}")
+        workflow.logger.info(f"Action build started: {job_dict}")
 
-        # Update the action status to building
         action = await workflow.execute_activity(
-            activity="update_action_status",
-            arg=UpdateActionStatusParams(
+            activity="update_action_with_build_info",
+            arg=UpdateActionWithBuildInfoParams(
                 action=action,
-                status=ActionStatus.BUILDING,
+                job_dict=job_dict,
             ),
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
+
+        workflow.logger.info(f"Action updated with build info: {action}")
 
         # Poll the build job until it's complete
         max_retries = 360
         retries = 0
         complete = False
+        job = None
         while retries < max_retries:
-            job = await workflow.execute_activity(
+            job_dict = await workflow.execute_activity(
                 activity="get_action_build_job",
                 arg=action,
                 start_to_close_timeout=timedelta(seconds=10),
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
+            job = Job.from_dict(job_dict)
 
             workflow.logger.info(f"Polling build job '{job.name}' status: {job.status}")
 
@@ -173,6 +189,9 @@ class CreateActionWorkflow:
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
         else:
-            raise ServiceError(f"Build job '{job.name}' timed out")
+            if job:
+                raise ServiceError(f"Build job '{job.name}' timed out")
+            else:
+                raise ServiceError(f"Build job not found")
 
         return action

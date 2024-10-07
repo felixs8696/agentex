@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError, HTTPException
 from starlette.responses import Response
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
 
-from agentex.api.schemas.actions import CreateActionResponse, CreateActionRequest
+from agentex.api.schemas.actions import CreateActionResponse, CreateActionRequest, GetActionResponse
 from agentex.api.schemas.agents import CreateAgentResponse, CreateAgentRequest
 from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest, GetTaskResponse
 from agentex.config import dependencies
@@ -96,6 +96,7 @@ async def custom_exception_handler(request: Request, error: Exception):
 class RouteTag(str, Enum):
     AGENTS = "Agents"
     TASKS = "Tasks"
+    ACTIONS = "Actions"
 
 
 def healthcheck() -> Response:
@@ -200,5 +201,21 @@ async def create_action(
         version=version,
         agents=agents_list,
     )
+    return CreateActionResponse.from_orm(action)
+
+
+@app.get(
+    path="/actions/{action_id}",
+    response_model=GetActionResponse,
+    tags=[RouteTag.ACTIONS],
+)
+async def get_action(
+    action_id: str,
+    actions_use_case: DActionsUseCase,
+):
+    """
+    Endpoint to get an action by its ID.
+    """
+    action = await actions_use_case.get(id=action_id)
     return CreateActionResponse.from_orm(action)
 

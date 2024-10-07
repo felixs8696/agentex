@@ -61,7 +61,8 @@ migration:
 	@echo "Copying the generated migration file to the local project..."
 	# Copy the generated migration file from the pod to your local directory
 	POD_MIGRATION_FILE=$$(minikube kubectl -- exec $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}') -- sh -c "ls /app/database/migrations/alembic/versions/*.py | sort | tail -n 1"); \
-	minikube kubectl cp $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}'):/app/database/migrations/alembic/versions/$$POD_MIGRATION_FILE ./database/migrations/alembic/versions/
+	FILE_NAME=$$(basename $$POD_MIGRATION_FILE); \
+	minikube kubectl cp $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex -o jsonpath='{.items[0].metadata.name}'):$$POD_MIGRATION_FILE ./database/migrations/alembic/versions/$$FILE_NAME
 
 	@echo "Migration generation completed and copied to the local machine."
 
