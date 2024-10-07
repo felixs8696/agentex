@@ -23,15 +23,17 @@ make install
 
 ### Run the server
 
-# In one terminal
-```commandline
-minikube mount $(pwd):/mnt/host/agentex
-```
-
-# In another terminal
+# In on terminal
 ```commandline
 make dev
 kubectl port-forward service/agentex 5003:80 # If the port forwarding is attempted before the pod is ready
+```
+
+# In other terminals
+```commandline
+kubectl port-forward service/agentex 5003:80 # Allows access to Agentex through localhost:5003
+kubectl port-forward svc/harbor 8080:80 --namespace harbor # Allows access to harbor UI through localhost:8080
+kubectl port-forward svc/temporal-web 3000:8080 # Allows access to Temporal Web through localhost:3000
 ```
 
 ### Helm Charts
