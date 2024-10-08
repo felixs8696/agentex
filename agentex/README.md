@@ -125,3 +125,10 @@ WARNING: There are "resources" sections in the chart not set. Using "resourcesPr
 +info https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 
 ```
+
+# TODO
+- [ ] Secure secrets with helm secrets
+- [ ] Restrict and rotate harbor secrets
+- [ ] Templatize hardcoded values (like Harbor registry)
+- [ ] Move Temporal to its own namespace
+- [ ] Separate deployments for each temporal worker pool
