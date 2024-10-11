@@ -6,7 +6,8 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from agentex.config.dependencies import DEnvironmentVariables
-from agentex.domain.entities.actions import Action, ActionStatus
+from agentex.domain.entities.actions import Action
+from agentex.domain.entities.agents import AgentStatus
 from agentex.domain.entities.job import Job, JobStatus
 from agentex.domain.exceptions import ServiceError
 from agentex.domain.services.agents.action_repository import DActionRepository
@@ -41,7 +42,7 @@ class BuildActionParams(BaseModel):
 
 class UpdateActionStatusParams(BaseModel):
     action: Action
-    status: ActionStatus
+    status: AgentStatus
 
 
 class CreateActionActivities:
@@ -91,7 +92,7 @@ class CreateActionActivities:
 
         job = Job.from_dict(job_dict)
 
-        action.status = ActionStatus.BUILDING
+        action.status = AgentStatus.BUILDING
         action.build_job_name = job.name
         action.build_job_namespace = job.namespace
         return await self.action_service.update_action(action=action)
@@ -183,7 +184,7 @@ class CreateActionWorkflow:
                 activity="update_action_status",
                 arg=UpdateActionStatusParams(
                     action=action,
-                    status=ActionStatus.READY,
+                    status=AgentStatus.READY,
                 ),
                 start_to_close_timeout=timedelta(seconds=10),
                 retry_policy=RetryPolicy(maximum_attempts=3),

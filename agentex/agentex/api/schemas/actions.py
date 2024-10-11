@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 
 from pydantic import Field, model_validator
 
-from agentex.domain.entities.actions import ActionStatus
+from agentex.domain.entities.agents import AgentStatus
 from agentex.utils.model_utils import BaseModel
 
 
@@ -28,17 +28,6 @@ class CreateActionRequest(BaseModel):
         ...,
         description="The version of the action."
     )
-    agents: Optional[List[str]] = Field(
-        None,
-        description="The list of agents, by name, that can use this action."
-    )
-
-    @classmethod
-    @model_validator(mode='before')
-    def validate_to_json(cls, value):
-        if isinstance(value, str):
-            return cls(**json.loads(value))
-        return value
 
 
 class GetActionResponse(BaseModel):
@@ -66,7 +55,7 @@ class GetActionResponse(BaseModel):
         ...,
         description="The version of the action."
     )
-    status: ActionStatus = Field(
+    status: AgentStatus = Field(
         ...,
         description="The status of the action."
     )

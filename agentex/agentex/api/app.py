@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from enum import Enum
 from typing import Optional, Dict, Annotated, Any, List
 
-from fastapi import FastAPI, Form, UploadFile, File, Body
+from fastapi import FastAPI, Form, UploadFile, File, Body, Depends
 from fastapi import Request
 from fastapi import status
 from fastapi.exception_handlers import http_exception_handler
@@ -21,6 +21,7 @@ from agentex.domain.use_cases.actions_use_case import DActionsUseCase
 from agentex.domain.use_cases.agents_use_case import DAgentsUseCase
 from agentex.domain.use_cases.tasks_use_case import DTaskUseCase
 from agentex.utils.logging import make_logger
+from agentex.utils.model_utils import BaseModel
 
 logger = make_logger(__name__)
 
@@ -113,17 +114,38 @@ for health_check_url in health_check_urls:
     )(healthcheck)
 
 
+@app.get(path="/")
+async def root():
+    return {"message": "Welcome to Agentex!"}
+
+
+class EchoMessage(BaseModel):
+    message: str
+
+
+@app.post(path="/echo")
+async def echo(request: EchoMessage):
+    return request
+
+
 @app.post(
     path="/agents",
     response_model=CreateAgentResponse,
     tags=[RouteTag.AGENTS],
 )
 async def create_agent(
-    request: CreateAgentRequest,
-    agent_crud_service: DAgentsUseCase,
+    agents_use_case: DAgentsUseCase,
+    agent_package: UploadFile = File(...),
+    request: CreateAgentRequest = Body(...),
 ) -> CreateAgentResponse:
     logger.info(f"Creating agent: {request}")
-    agent = await agent_crud_service.create(name=request.name)
+    agent = await agents_use_case.create(
+        agent_package=agent_package,
+        action_service_port=request.action_service_port,
+        name=request.name,
+        description=request.description,
+        version=request.version,
+    )
     return CreateAgentResponse.from_orm(agent)
 
 
@@ -156,7 +178,11 @@ async def get_task(
     return get_task_response
 
 
-@app.post("/actions")
+@app.post(
+    path="/actions",
+    response_model=CreateActionResponse,
+    tags=[RouteTag.ACTIONS],
+)
 async def create_action(
     code_package: Annotated[UploadFile, File()],
     actions_use_case: DActionsUseCase,

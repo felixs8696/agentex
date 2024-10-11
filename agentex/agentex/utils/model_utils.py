@@ -1,7 +1,7 @@
 import json
 from typing import Any, Dict, Optional, Type, TypeVar
 
-from pydantic import BaseModel as PydanticBaseModel, ConfigDict
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, model_validator
 
 T = TypeVar("T", bound="BaseModel")
 
@@ -32,3 +32,10 @@ class BaseModel(PydanticBaseModel):
 
     def to_dict(self, *args, **kwargs) -> Dict[str, Any]:
         return self.model_dump(*args, **kwargs)
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_to_json(cls, value):
+        if isinstance(value, str):
+            return cls(**json.loads(value))
+        return value

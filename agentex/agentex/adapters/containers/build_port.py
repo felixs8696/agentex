@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
+
+from agentex.domain.entities.job import Job
 
 
 class ContainerBuildGateway(ABC):
@@ -11,5 +14,5 @@ class ContainerBuildGateway(ABC):
         tag: str,
         zip_file_path: str,
         registry_url: str,
-    ):
+    ) -> Tuple[str, Job]:
         pass

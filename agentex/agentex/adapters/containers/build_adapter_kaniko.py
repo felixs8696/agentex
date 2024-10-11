@@ -1,6 +1,5 @@
-import os
 import uuid
-from typing import Annotated
+from typing import Annotated, Tuple
 
 from fastapi import Depends
 from kubernetes_asyncio import client
@@ -8,6 +7,7 @@ from kubernetes_asyncio import client
 from agentex.adapters.containers.build_port import ContainerBuildGateway
 from agentex.adapters.kubernetes.adapter_kubernetes import DKubernetesGateway
 from agentex.config.dependencies import DEnvironmentVariables
+from agentex.domain.entities.job import Job
 
 
 class KanikoBuildGateway(ContainerBuildGateway):
@@ -32,13 +32,14 @@ class KanikoBuildGateway(ContainerBuildGateway):
         tag: str,
         zip_file_path: str,
         registry_url: str,
-    ):
+    ) -> Tuple[str, Job]:
         unique_id = self._uid()
         _image = image.replace('/', '-').replace('_', '-').lower()
         job_name = f"build-{_image}-{tag}-{unique_id}"
+        full_image_url = f"{registry_url}/{image}:{tag}"
 
         # Create the Kaniko Job spec
-        job = client.V1Job(
+        job_spec = client.V1Job(
             api_version="batch/v1",
             kind="Job",
             metadata=client.V1ObjectMeta(name=job_name),
@@ -53,7 +54,7 @@ class KanikoBuildGateway(ContainerBuildGateway):
                                 args=[
                                     f"--context=tar://{zip_file_path}",  # Use tar if you compress the zip
                                     "--dockerfile=Dockerfile",  # Adjust based on your file structure
-                                    f"--destination={registry_url}/{image}:{tag}",
+                                    f"--destination={full_image_url}",
                                 ],
                                 env=[
                                     client.V1EnvVar(
@@ -100,35 +101,9 @@ class KanikoBuildGateway(ContainerBuildGateway):
             )
         )
 
-        return await self.k8s.create_job(namespace=namespace, job=job)
+        job = await self.k8s.create_job(namespace=namespace, job=job_spec)
 
+        return full_image_url, job
 
-#
-#     def monitor_job_status(self, job_name: str) -> str:
-#         """Monitor job status and return logs."""
-#         job_status = self.batch_v1.read_namespaced_job_status(job_name, self.namespace)
-#         if job_status.status.succeeded:
-#             print(f"Job '{job_name}' succeeded.")
-#         elif job_status.status.failed:
-#             print(f"Job '{job_name}' failed.")
-#         return job_status.status
-#
-#
-# # Instantiate the manager and create the job
-# kaniko_manager = KanikoBuildManager(
-#     registry_url="harbor.yourdomain.com/library",
-#     namespace="default"
-# )
-#
-# # Define the tarball path, the image name, and the job name
-# tar_file_path = "/path/to/your/tarball.tar"
-# image_name = "my-image"
-# job_name = "kaniko-build-job"
-#
-# # Submit the Kaniko job
-# kaniko_manager.submit_kaniko_job(tar_file_path, image_name, job_name)
-#
-# # Monitor the job status
-# status = kaniko_manager.monitor_job_status(job_name)
 
 DKanikoBuildGateway = Annotated[KanikoBuildGateway, Depends(KanikoBuildGateway)]

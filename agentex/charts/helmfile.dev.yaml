@@ -10,17 +10,17 @@ repositories:
 releases:
 #  - name: redis
 #    chart: bitnami/redis
-
-  - name: kafka
-    chart: bitnami/kafka
-    namespace: kafka
-    values:
-      - zookeeper:
-          replicaCount: 1
-        replicaCount: 1
-        persistence:
-          enabled: true
-          size: 10Gi
+#
+#  - name: kafka
+#    chart: bitnami/kafka
+#    namespace: kafka
+#    values:
+#      - zookeeper:
+#          replicaCount: 1
+#        replicaCount: 1
+#        persistence:
+#          enabled: true
+#          size: 10Gi
 
   - name: temporal
     chart: temporal/temporal

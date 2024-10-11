@@ -5,7 +5,8 @@ from fastapi import Depends
 from agentex.adapters.containers.build_adapter_kaniko import DKanikoBuildGateway
 from agentex.adapters.kubernetes.adapter_kubernetes import DKubernetesGateway
 from agentex.config.dependencies import DEnvironmentVariables
-from agentex.domain.entities.actions import Action, ActionStatus
+from agentex.domain.entities.actions import Action
+from agentex.domain.entities.agents import AgentStatus
 from agentex.domain.entities.job import Job
 from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agents.action_repository import DActionRepository

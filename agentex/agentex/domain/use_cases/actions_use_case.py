@@ -8,12 +8,13 @@ from fastapi import Depends, UploadFile
 
 from agentex.adapters.async_runtime.adapter_temporal import DTemporalGateway
 from agentex.config.dependencies import DEnvironmentVariables
-from agentex.domain.entities.actions import Action, ActionStatus
+from agentex.domain.entities.actions import Action
+from agentex.domain.entities.agents import AgentStatus
 from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agents.action_repository import DActionRepository
 from agentex.domain.services.agents.action_service import DActionService
 from agentex.domain.services.agents.agent_repository import DAgentRepository
-from agentex.domain.workflows.constants import BUILD_ACTION_TASK_QUEUE
+from agentex.domain.workflows.constants import BUILD_AGENT_TASK_QUEUE
 from agentex.domain.workflows.create_action_workflow import CreateActionWorkflow, CreateActionWorkflowParams
 from agentex.utils.ids import orm_id
 from agentex.utils.json_schema import validate_payload, JSONSchemaValidationError
@@ -22,7 +23,7 @@ from agentex.utils.logging import make_logger
 logger = make_logger(__name__)
 
 
-class ActionUnzipError(ClientError):
+class TarfileError(ClientError):
     """
     Error raised when there is an issue with unzipping the code package.
     """
@@ -51,7 +52,7 @@ class ActionsUseCase:
         self.action_service = action_service
         self.async_runtime = async_runtime
         self.build_contexts_path = environment_variables.BUILD_CONTEXTS_PATH
-        self.task_queue = BUILD_ACTION_TASK_QUEUE
+        self.task_queue = BUILD_AGENT_TASK_QUEUE
 
     async def create(
         self,
@@ -87,7 +88,7 @@ class ActionsUseCase:
                     extracted_files = [member.name for member in tar_ref.getmembers()]  # Get list of file names
                     logger.info(f"Extracted files: {extracted_files}")
             except Exception as e:
-                raise ActionUnzipError(f"Error extracting tar file: {e}") from e
+                raise TarfileError(f"Error extracting tar file: {e}") from e
 
             # Run Docker container to validate the code package using the gateway
             image = name
@@ -106,7 +107,7 @@ class ActionsUseCase:
                 parameters=parameters,
                 test_payload=test_payload,
                 docker_image=docker_image_uri,
-                status=ActionStatus.PENDING,
+                status=AgentStatus.PENDING,
                 build_job_name=None,
                 build_job_namespace=None,
             )

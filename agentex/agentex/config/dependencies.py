@@ -10,6 +10,7 @@ from temporalio.client import Client as TemporalClient
 from agentex.config.environment_variables import EnvironmentVariables, Environment
 from agentex.utils.database import async_db_engine_creator
 from agentex.utils.logging import make_logger
+from agentex.utils.temporal_client import get_temporal_client
 
 logger = make_logger(__name__)
 
@@ -43,7 +44,7 @@ class GlobalDependencies(metaclass=Singleton):
         ]:
             return None
         else:
-            return await TemporalClient.connect(
+            return await get_temporal_client(
                 self.environment_variables.TEMPORAL_ADDRESS
             )
 
