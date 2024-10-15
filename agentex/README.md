@@ -67,7 +67,7 @@ One time setup (See: https://github.com/temporalio/helm-charts?tab=readme-ov-fil
 ```commandline
 kubectl exec -it services/temporaltest-admintools /bin/bash
 tctl --ns default namespace desc  # if not found
-tctl --ns default namespace re
+he
 ```
 
 

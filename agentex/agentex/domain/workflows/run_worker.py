@@ -124,6 +124,7 @@ async def run_create_agent_worker(
         )
         k8s_gateway = KubernetesGateway(
             http_gateway=HttpxGateway(),
+            environment_variables=environment_variables,
         )
         build_gateway = KanikoBuildGateway(
             kubernetes_gateway=k8s_gateway,

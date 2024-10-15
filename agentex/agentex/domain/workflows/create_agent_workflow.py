@@ -442,7 +442,7 @@ class CreateAgentWorkflow:
                 action_service_port=action_service_port,
             ),
             start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(maximum_attempts=3),
+            retry_policy=RetryPolicy(maximum_attempts=0),
         )
 
         max_retries = 360
@@ -502,7 +502,7 @@ class CreateAgentWorkflow:
                 action_service_port=action_service_port,
             ),
             start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(maximum_attempts=3),
+            retry_policy=RetryPolicy(maximum_attempts=0),
         )
 
         max_retries = 360

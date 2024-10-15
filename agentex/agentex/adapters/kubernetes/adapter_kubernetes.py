@@ -7,6 +7,7 @@ from kubernetes_asyncio.client import V1Job, ApiClient, ApiException, V1Deployme
 
 from agentex.adapters.http.adapter_httpx import DHttpxGateway
 from agentex.adapters.kubernetes.port import KubernetesPort
+from agentex.config.dependencies import DEnvironmentVariables
 from agentex.domain.entities.deployment import Deployment, DeploymentStatus, DeploymentCondition
 from agentex.domain.entities.job import Job, JobStatus, JobCondition
 from agentex.domain.entities.service import Service, ServiceCondition
@@ -26,8 +27,13 @@ class KubernetesError(ServiceError):
 
 class KubernetesGateway(KubernetesPort):
 
-    def __init__(self, http_gateway: DHttpxGateway):
+    def __init__(
+        self,
+        http_gateway: DHttpxGateway,
+        environment_variables: DEnvironmentVariables,
+    ):
         self.http_gateway = http_gateway
+        self.build_registry_secret_name = environment_variables.BUILD_REGISTRY_SECRET_NAME
 
     async def create_job(self, namespace: str, job: V1Job) -> Job:
         async with ApiClient() as api:
@@ -77,9 +83,30 @@ class KubernetesGateway(KubernetesPort):
                                     client.V1Container(
                                         name=name,
                                         image=image,
-                                        ports=[client.V1ContainerPort(container_port=container_port)]
+                                        image_pull_policy="IfNotPresent",
+                                        ports=[client.V1ContainerPort(container_port=container_port)],
+                                        env=[
+                                            client.V1EnvVar(
+                                                name="DOCKER_CONFIG",
+                                                value="/root/.docker"
+                                            )
+                                        ],
+                                        volume_mounts=[
+                                            client.V1VolumeMount(
+                                                name="build-registry-secret",  # Mount the existing PVC
+                                                mount_path="/root/.docker"  # Mount the PVC where the zip is located
+                                            ),
+                                        ]
                                     )
-                                ]
+                                ],
+                                volumes=[
+                                    client.V1Volume(
+                                        name="build-registry-secret",
+                                        secret=client.V1SecretVolumeSource(
+                                            secret_name=self.build_registry_secret_name,
+                                        ),
+                                    ),
+                                ],
                             )
                         )
                     )
