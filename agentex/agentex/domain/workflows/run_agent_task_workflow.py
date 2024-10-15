@@ -16,7 +16,7 @@ from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.services.agents.agent_state_service import DAgentStateService
 from agentex.domain.workflows.create_agent_workflow import UpdateAgentStatusParams
 from agentex.domain.workflows.services.hosted_actions_service import start_hosted_actions_server, \
-    delete_hosted_actions_server
+    delete_hosted_actions_server, mark_agent_as_active, mark_agent_as_idle
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
 
@@ -137,6 +137,7 @@ class AgentTaskWorkflow:
         task = params.task
         agent = params.agent_config
 
+        # Give the agent the initial task
         success = await workflow.execute_activity(
             activity="init_task_state",
             arg=InitTaskStateParams(
@@ -148,19 +149,11 @@ class AgentTaskWorkflow:
         )
         logger.info(f"Task state initialized: {success}")
 
+        # Start up the action server
         hosted_actions_service = await start_hosted_actions_server(agent=agent)
 
-        # Set the agent status to READY
-        await workflow.execute_activity(
-            activity="update_agent_status",
-            arg=UpdateAgentStatusParams(
-                agent=agent,
-                status=AgentStatus.ACTIVE,
-                reason=f"Agent actions have been spun up and agent is active.",
-            ),
-            start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )
+        # Set the agent status to ACTIVE
+        await mark_agent_as_active(agent=agent)
 
         content = None
         finish_reason = None
@@ -208,16 +201,8 @@ class AgentTaskWorkflow:
             # Wait for all tool activities to complete
             await asyncio.gather(*take_action_activities)
 
-        await workflow.execute_activity(
-            activity="update_agent_status",
-            arg=UpdateAgentStatusParams(
-                agent=agent,
-                status=AgentStatus.IDLE,
-                reason="Agent has returned to idle state until it receives its next task.",
-            ),
-            start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )
+        # Set the agent status to IDLE
+        await mark_agent_as_idle(agent=agent)
 
         # When finished, delete the hosted action server. It will get recreated when the next task
         # is submitted

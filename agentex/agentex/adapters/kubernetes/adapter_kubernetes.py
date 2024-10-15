@@ -44,7 +44,7 @@ class KubernetesGateway(KubernetesPort):
             )
         return self._convert_job_to_entity(job)
 
-    async def get_job(self, namespace: str, name: str) -> Job:
+    async def get_job(self, namespace: str, name: str) -> Optional[Job]:
         async with client.ApiClient() as api:
             batch_v1 = client.BatchV1Api(api)
             job = await batch_v1.read_namespaced_job(name=name, namespace=namespace)
@@ -115,7 +115,7 @@ class KubernetesGateway(KubernetesPort):
             )
         return self._convert_deploy_to_entity(deployment)
 
-    async def get_deployment(self, namespace: str, name: str) -> Deployment:
+    async def get_deployment(self, namespace: str, name: str) -> Optional[Deployment]:
         async with ApiClient() as api:
             apps_v1 = client.AppsV1Api(api)
             deployment = await apps_v1.read_namespaced_deployment(name=name, namespace=namespace)
@@ -160,7 +160,7 @@ class KubernetesGateway(KubernetesPort):
             )
         return self._convert_service_to_entity(service)
 
-    async def get_service(self, namespace: str, name: str) -> Service:
+    async def get_service(self, namespace: str, name: str) -> Optional[Service]:
         async with ApiClient() as api:
             core_v1 = client.CoreV1Api(api)
             service = await core_v1.read_namespaced_service(name=name, namespace=namespace)
@@ -190,8 +190,11 @@ class KubernetesGateway(KubernetesPort):
         )
 
     @staticmethod
-    def _convert_job_to_entity(job: V1Job) -> Job:
+    def _convert_job_to_entity(job: Optional[V1Job] = None) -> Optional[Job]:
         """Convert Kubernetes V1Job object to Pydantic JobModel."""
+        if not job:
+            return None
+
         job_status = job.status
 
         # Determine status
@@ -214,10 +217,12 @@ class KubernetesGateway(KubernetesPort):
         )
 
     @staticmethod
-    def _convert_deploy_to_entity(deployment: V1Deployment) -> Deployment:
+    def _convert_deploy_to_entity(deployment: Optional[V1Deployment] = None) -> Optional[Deployment]:
         """
         Convert Kubernetes V1Deployment object to Pydantic DeploymentModel.
         """
+        if not deployment:
+            return None
         deployment_status = deployment.status
         if deployment_status.available_replicas > 0:
             status = DeploymentStatus.READY
@@ -240,10 +245,12 @@ class KubernetesGateway(KubernetesPort):
         )
 
     @staticmethod
-    def _convert_service_to_entity(service: client.V1Service) -> Service:
+    def _convert_service_to_entity(service: Optional[client.V1Service] = None) -> Optional[Service]:
         """
         Convert Kubernetes V1Service object to Pydantic ServiceModel.
         """
+        if not service:
+            return None
         metadata = service.metadata
         return Service(
             name=metadata.name,

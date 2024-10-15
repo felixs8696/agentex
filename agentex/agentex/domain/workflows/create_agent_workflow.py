@@ -15,7 +15,8 @@ from agentex.domain.entities.service import Service
 from agentex.domain.exceptions import ServiceError
 from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.workflows.services.hosted_actions_service import build_and_push_agent, \
-    create_hosted_actions_deployment, create_hosted_actions_service, poll_service_for_agent_spec
+    create_hosted_actions_deployment, create_hosted_actions_service, poll_service_for_agent_spec, \
+    start_hosted_actions_server
 from agentex.utils.ids import orm_id, short_id
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
@@ -136,48 +137,8 @@ class CreateAgentWorkflow:
         )
 
         # Create the agent deployment and service to fetch the agent spec
-        temp_app_name = f"{agent_name}-{short_id()}-build"
-        deployment = await create_hosted_actions_deployment(
-            name=temp_app_name,
-            image=image_url,
-            action_service_port=action_service_port,
-        )
-
-        try:
-            service = await create_hosted_actions_service(
-                name=temp_app_name,
-                action_service_port=action_service_port,
-            )
-        except Exception as error:
-            # Clean up the deployment if the service creation fails
-            await workflow.execute_activity(
-                activity="delete_hosted_actions_deployment",
-                arg=deployment.name,
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
-            raise error
-
-        try:
-            agent_spec = await poll_service_for_agent_spec(
-                name=temp_app_name,
-                port=action_service_port,
-            )
-        except Exception as error:
-            # Clean up the deployment and service if the polling fails
-            await workflow.execute_activity(
-                activity="delete_hosted_actions_deployment",
-                arg=deployment.name,
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
-            await workflow.execute_activity(
-                activity="delete_hosted_actions_service",
-                arg=service.name,
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=RetryPolicy(maximum_attempts=3),
-            )
-            raise error
+        hosted_actions_service = await start_hosted_actions_server(agent=agent)
+        agent_spec = hosted_actions_service.agent_spec
 
         # Create the agent and actions
         agent = Agent(

@@ -72,10 +72,10 @@ class AgentService:
             container_port=action_service_port,
         )
 
-    async def get_hosted_actions_deployment(self, name: str) -> Deployment:
+    async def get_hosted_actions_deployment(self, name: str) -> Optional[Deployment]:
         return await self.k8s.get_deployment(namespace=self.default_namespace, name=name)
 
-    async def get_hosted_actions_service(self, name: str) -> Service:
+    async def get_hosted_actions_service(self, name: str) -> Optional[Service]:
         return await self.k8s.get_service(namespace=self.default_namespace, name=name)
 
     async def call_hosted_actions_service(
@@ -111,7 +111,7 @@ class AgentService:
             registry_url=self.registry_url,
         )
 
-    async def get_build_job(self, name: str) -> Job:
+    async def get_build_job(self, name: str) -> Optional[Job]:
         return await self.k8s.get_job(namespace=self.default_namespace, name=name)
 
     async def delete_build_job(self, name: str):

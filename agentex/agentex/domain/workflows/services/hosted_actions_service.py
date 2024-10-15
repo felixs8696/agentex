@@ -1,13 +1,13 @@
 import asyncio
 from datetime import timedelta
-from typing import Tuple
+from typing import Tuple, Optional
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from agentex.config.dependencies import DEnvironmentVariables
 from agentex.domain.entities.agent_spec import AgentSpec
-from agentex.domain.entities.agents import Agent
+from agentex.domain.entities.agents import Agent, AgentStatus
 from agentex.domain.entities.deployment import Deployment, DeploymentStatus
 from agentex.domain.entities.hosted_actions_service import HostedActionsService
 from agentex.domain.entities.job import Job, JobStatus
@@ -51,7 +51,7 @@ class HostedActionsServiceActivities:
     async def get_build_job(
         self,
         name: str
-    ) -> Job:
+    ) -> Optional[Job]:
         return await self.agent_service.get_build_job(name=name)
 
     @activity.defn(name="delete_build_job")
@@ -95,14 +95,14 @@ class HostedActionsServiceActivities:
     async def get_hosted_actions_deployment(
         self,
         name: str,
-    ) -> Deployment:
+    ) -> Optional[Deployment]:
         return await self.agent_service.get_hosted_actions_deployment(name=name)
 
     @activity.defn(name="get_hosted_actions_service")
     async def get_hosted_actions_service(
         self,
         name: str,
-    ) -> Service:
+    ) -> Optional[Service]:
         return await self.agent_service.get_hosted_actions_service(name=name)
 
     @activity.defn(name="call_hosted_actions_service")
@@ -235,22 +235,12 @@ async def build_and_push_agent(
 async def create_hosted_actions_deployment(
     name: str,
     image: str,
-    action_service_port: int
+    action_service_port: int,
 ) -> Deployment:
-    deployment = await workflow.execute_activity(
-        activity="create_hosted_actions_deployment",
-        arg=CreateHostedActionsDeploymentParams(
-            name=name,
-            image=image,
-            action_service_port=action_service_port,
-        ),
-        start_to_close_timeout=timedelta(seconds=10),
-        retry_policy=RetryPolicy(maximum_attempts=0),
-    )
-
     max_retries = 360
     retries = 0
     complete = False
+    deployment = None
     while retries < max_retries:
         deployment = await workflow.execute_activity(
             activity="get_hosted_actions_deployment",
@@ -258,6 +248,19 @@ async def create_hosted_actions_deployment(
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
+
+        # Create the deployment if it couldn't be found, otherwise just wait till its ready
+        if not deployment:
+            deployment = await workflow.execute_activity(
+                activity="create_hosted_actions_deployment",
+                arg=CreateHostedActionsDeploymentParams(
+                    name=name,
+                    image=image,
+                    action_service_port=action_service_port,
+                ),
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=0),
+            )
 
         workflow.logger.info(f"Polling agent action deployment '{deployment.name}' status: {deployment.status}")
 
@@ -298,19 +301,10 @@ async def create_hosted_actions_service(
     name: str,
     action_service_port: int,
 ) -> Service:
-    service = await workflow.execute_activity(
-        activity="create_hosted_actions_service",
-        arg=CreateHostedActionsServiceParams(
-            name=name,
-            action_service_port=action_service_port,
-        ),
-        start_to_close_timeout=timedelta(seconds=10),
-        retry_policy=RetryPolicy(maximum_attempts=0),
-    )
-
     max_retries = 360
     retries = 0
     complete = False
+    service = None
     while retries < max_retries:
         service = await workflow.execute_activity(
             activity="get_hosted_actions_service",
@@ -318,6 +312,17 @@ async def create_hosted_actions_service(
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
+
+        if not service:
+            service = await workflow.execute_activity(
+                activity="create_hosted_actions_service",
+                arg=CreateHostedActionsServiceParams(
+                    name=name,
+                    action_service_port=action_service_port,
+                ),
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=0),
+            )
 
         workflow.logger.info(f"Polling agent action service '{service.name}' status: {service.status}")
 
@@ -393,16 +398,16 @@ async def poll_service_for_agent_spec(
 
 async def start_hosted_actions_server(agent: Agent) -> HostedActionsService:
     # Create the agent deployment and service to fetch the agent spec
-    temp_app_name = f"{agent.name}-{short_id()}-build"
+    server_name = f"{agent.name}-{agent.version}"
     deployment = await create_hosted_actions_deployment(
-        name=temp_app_name,
+        name=server_name,
         image=agent.docker_image,
         action_service_port=agent.action_service_port,
     )
 
     try:
         service = await create_hosted_actions_service(
-            name=temp_app_name,
+            name=server_name,
             action_service_port=agent.action_service_port,
         )
     except Exception as error:
@@ -417,7 +422,7 @@ async def start_hosted_actions_server(agent: Agent) -> HostedActionsService:
 
     try:
         agent_spec = await poll_service_for_agent_spec(
-            name=temp_app_name,
+            name=server_name,
             port=agent.action_service_port,
         )
     except Exception as error:
@@ -448,6 +453,33 @@ async def delete_hosted_actions_server(service_name: str, deployment_name: str):
     await workflow.execute_activity(
         activity="delete_hosted_actions_deployment",
         arg=deployment_name,
+        start_to_close_timeout=timedelta(seconds=10),
+        retry_policy=RetryPolicy(maximum_attempts=3),
+    )
+
+
+async def mark_agent_as_active(agent: Agent):
+    # Set the agent status to ACTIVE
+    await workflow.execute_activity(
+        activity="update_agent_status",
+        arg=UpdateAgentStatusParams(
+            agent=agent,
+            status=AgentStatus.ACTIVE,
+            reason="Agent actions are available and agent can actively field tasks.",
+        ),
+        start_to_close_timeout=timedelta(seconds=10),
+        retry_policy=RetryPolicy(maximum_attempts=3),
+    )
+
+
+async def mark_agent_as_idle(agent: Agent):
+    await workflow.execute_activity(
+        activity="update_agent_status",
+        arg=UpdateAgentStatusParams(
+            agent=agent,
+            status=AgentStatus.IDLE,
+            reason="Agent has returned to idle state until it receives its next task.",
+        ),
         start_to_close_timeout=timedelta(seconds=10),
         retry_policy=RetryPolicy(maximum_attempts=3),
     )

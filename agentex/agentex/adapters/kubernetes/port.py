@@ -15,7 +15,7 @@ class KubernetesPort(ABC):
         pass
 
     @abstractmethod
-    async def get_job(self, namespace: str, name: str) -> Job:
+    async def get_job(self, namespace: str, name: str) -> Optional[Job]:
         pass
 
     @abstractmethod
@@ -34,7 +34,7 @@ class KubernetesPort(ABC):
         pass
 
     @abstractmethod
-    async def get_deployment(self, namespace: str, name: str) -> Deployment:
+    async def get_deployment(self, namespace: str, name: str) -> Optional[Deployment]:
         pass
 
     @abstractmethod
@@ -52,7 +52,7 @@ class KubernetesPort(ABC):
         pass
 
     @abstractmethod
-    async def get_service(self, namespace: str, name: str) -> Service:
+    async def get_service(self, namespace: str, name: str) -> Optional[Service]:
         pass
 
     @abstractmethod
