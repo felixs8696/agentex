@@ -14,16 +14,14 @@ from agentex.adapters.llm.adapter_litellm import LiteLLMGateway
 from agentex.config.dependencies import GlobalDependencies, database_async_read_write_session_maker
 from agentex.config.environment_variables import EnvironmentVariables
 from agentex.domain.services.agents.action_repository import ActionRepository
-from agentex.domain.services.agents.action_service import ActionService
 from agentex.domain.services.agents.agent_repository import AgentRepository
 from agentex.domain.services.agents.agent_service import AgentService
 from agentex.domain.services.agents.agent_state_repository import AgentStateRepository
 from agentex.domain.services.agents.agent_state_service import AgentStateService
-from agentex.domain.workflows.agent_task_workflow import AgentTaskWorkflow, AgentTaskActivities
+from agentex.domain.workflows.run_agent_task_workflow import AgentTaskWorkflow, AgentTaskActivities
 from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE, BUILD_AGENT_TASK_QUEUE
-from agentex.domain.workflows.create_action_workflow import CreateActionWorkflow, CreateActionActivities
 from agentex.domain.workflows.create_agent_workflow import CreateAgentActivities, CreateAgentWorkflow
-
+from agentex.domain.workflows.services.hosted_actions_service import HostedActionsServiceActivities
 from agentex.utils.logging import make_logger
 
 logger = make_logger(__name__)
@@ -60,17 +58,52 @@ async def run_agent_task_worker(
     task_queue=AGENT_TASK_TASK_QUEUE,
 ):
     try:
-        agent_activities = AgentTaskActivities(
-            agent_state_service=AgentStateService(
-                repository=AgentStateRepository(
-                    memory_repo=RedisRepository(
-                        environment_variables=environment_variables,
-                    )
+        async_read_write_session_maker = database_async_read_write_session_maker(
+            db_async_read_write_engine=global_dependencies.database_async_read_write_engine,
+        )
+        action_repository = ActionRepository(
+            async_read_write_session_maker=async_read_write_session_maker,
+        )
+        agent_repository = AgentRepository(
+            async_read_write_session_maker=async_read_write_session_maker,
+            action_repository=action_repository,
+        )
+        k8s_gateway = KubernetesGateway(
+            http_gateway=HttpxGateway(),
+            environment_variables=environment_variables,
+        )
+        build_gateway = KanikoBuildGateway(
+            kubernetes_gateway=k8s_gateway,
+            environment_variables=environment_variables,
+        )
+        agent_service = AgentService(
+            build_gateway=build_gateway,
+            agent_repository=agent_repository,
+            action_repository=action_repository,
+            kubernetes_gateway=k8s_gateway,
+            environment_variables=environment_variables,
+        )
+
+        agent_state_service = AgentStateService(
+            repository=AgentStateRepository(
+                memory_repo=RedisRepository(
+                    environment_variables=environment_variables,
                 )
-            ),
-            llm_gateway=LiteLLMGateway(
-                environment_variables=environment_variables,
-            ),
+            )
+        )
+        llm_gateway = LiteLLMGateway(
+            environment_variables=environment_variables,
+        )
+
+        agent_activities = AgentTaskActivities(
+            agent_service=agent_service,
+            agent_state_service=agent_state_service,
+            llm_gateway=llm_gateway,
+        )
+
+        hosted_actions_service_activities = HostedActionsServiceActivities(
+            agent_service=agent_service,
+            environment_variables=environment_variables,
         )
 
         # Run the worker
@@ -87,6 +120,13 @@ async def run_agent_task_worker(
                 agent_activities.init_task_state,
                 agent_activities.decide_action,
                 agent_activities.take_action,
+                hosted_actions_service_activities.create_hosted_actions_service,
+                hosted_actions_service_activities.create_hosted_actions_deployment,
+                hosted_actions_service_activities.get_hosted_actions_service,
+                hosted_actions_service_activities.get_hosted_actions_deployment,
+                hosted_actions_service_activities.delete_hosted_actions_service,
+                hosted_actions_service_activities.delete_hosted_actions_deployment,
+                hosted_actions_service_activities.call_hosted_actions_service,
             ],
             workflow_runner=UnsandboxedWorkflowRunner(),
             max_concurrent_activities=environment_variables.TEMPORAL_WORKER_MAX_ACTIVITIES_PER_WORKER,
@@ -130,15 +170,21 @@ async def run_create_agent_worker(
             kubernetes_gateway=k8s_gateway,
             environment_variables=environment_variables,
         )
+        agent_service = AgentService(
+            build_gateway=build_gateway,
+            agent_repository=agent_repository,
+            action_repository=action_repository,
+            kubernetes_gateway=k8s_gateway,
+            environment_variables=environment_variables,
+        )
 
         create_agent_activities = CreateAgentActivities(
-            agent_service=AgentService(
-                build_gateway=build_gateway,
-                agent_repository=agent_repository,
-                action_repository=action_repository,
-                kubernetes_gateway=k8s_gateway,
-                environment_variables=environment_variables,
-            ),
+            agent_service=agent_service,
+            environment_variables=environment_variables,
+        )
+
+        hosted_actions_service_activities = HostedActionsServiceActivities(
+            agent_service=agent_service,
             environment_variables=environment_variables,
         )
 
@@ -153,19 +199,19 @@ async def run_create_agent_worker(
                 CreateAgentWorkflow,
             ],
             activities=[
-                create_agent_activities.build_agent_action_service,
-                create_agent_activities.create_agent_action_deployment,
-                create_agent_activities.create_agent_action_service,
-                create_agent_activities.get_agent_action_deployment,
-                create_agent_activities.get_agent_action_service,
-                create_agent_activities.call_agent_action_service,
-                create_agent_activities.delete_agent_action_deployment,
-                create_agent_activities.delete_agent_action_service,
-                create_agent_activities.get_build_job,
-                create_agent_activities.delete_build_job,
                 create_agent_activities.create_actions,
                 create_agent_activities.update_agent,
                 create_agent_activities.update_agent_status,
+                hosted_actions_service_activities.build_hosted_actions_service,
+                hosted_actions_service_activities.get_build_job,
+                hosted_actions_service_activities.delete_build_job,
+                hosted_actions_service_activities.create_hosted_actions_service,
+                hosted_actions_service_activities.create_hosted_actions_deployment,
+                hosted_actions_service_activities.get_hosted_actions_service,
+                hosted_actions_service_activities.get_hosted_actions_deployment,
+                hosted_actions_service_activities.delete_hosted_actions_service,
+                hosted_actions_service_activities.delete_hosted_actions_deployment,
+                hosted_actions_service_activities.call_hosted_actions_service,
             ],
             workflow_runner=UnsandboxedWorkflowRunner(),
             max_concurrent_activities=environment_variables.TEMPORAL_WORKER_MAX_ACTIVITIES_PER_WORKER,

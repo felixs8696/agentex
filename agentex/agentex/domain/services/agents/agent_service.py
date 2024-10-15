@@ -46,7 +46,7 @@ class AgentService:
 
         return agent, actions
 
-    async def create_agent_action_deployment(
+    async def create_hosted_actions_deployment(
         self,
         name: str,
         image: str,
@@ -61,7 +61,7 @@ class AgentService:
             replicas=replicas,
         )
 
-    async def create_agent_action_service(
+    async def create_hosted_actions_service(
         self,
         name: str,
         action_service_port: int,
@@ -72,16 +72,17 @@ class AgentService:
             container_port=action_service_port,
         )
 
-    async def get_agent_action_deployment(self, name: str) -> Deployment:
+    async def get_hosted_actions_deployment(self, name: str) -> Deployment:
         return await self.k8s.get_deployment(namespace=self.default_namespace, name=name)
 
-    async def get_agent_action_service(self, name: str) -> Service:
+    async def get_hosted_actions_service(self, name: str) -> Service:
         return await self.k8s.get_service(namespace=self.default_namespace, name=name)
 
-    async def call_agent_action_service(
+    async def call_hosted_actions_service(
         self,
         name: str,
         port: int,
+        path: str,
         method: str = "GET",
         payload: Optional[dict] = None
     ):
@@ -89,18 +90,19 @@ class AgentService:
             namespace=self.default_namespace,
             name=name,
             port=port,
+            path=path,
             method=method,
             payload=payload
         )
         return AgentSpec.from_dict(agent_spec)
 
-    async def delete_agent_action_deployment(self, name: str):
+    async def delete_hosted_actions_deployment(self, name: str):
         return await self.k8s.delete_deployment(namespace=self.default_namespace, name=name)
 
-    async def delete_agent_action_service(self, name: str):
+    async def delete_hosted_actions_service(self, name: str):
         return await self.k8s.delete_service(namespace=self.default_namespace, name=name)
 
-    async def build_agent_action_service(self, image: str, tag: str, zip_file_path: str) -> Tuple[str, Job]:
+    async def build_hosted_actions_service(self, image: str, tag: str, zip_file_path: str) -> Tuple[str, Job]:
         return await self.build_gateway.build_image(
             namespace=self.default_namespace,
             image=image,

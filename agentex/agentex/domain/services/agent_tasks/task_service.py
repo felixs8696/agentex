@@ -6,7 +6,7 @@ from agentex.adapters.async_runtime.adapter_temporal import DTemporalGateway
 from agentex.domain.entities.agent_config import AgentConfig
 from agentex.domain.entities.tasks import Task
 from agentex.domain.entities.workflows import WorkflowState
-from agentex.domain.workflows.agent_task_workflow import AgentTaskWorkflow, AgentTaskWorkflowParams
+from agentex.domain.workflows.run_agent_task_workflow import AgentTaskWorkflow, AgentTaskWorkflowParams
 from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE
 
 

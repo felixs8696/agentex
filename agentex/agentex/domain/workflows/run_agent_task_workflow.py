@@ -1,16 +1,22 @@
 import asyncio
 import json
 from datetime import timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from agentex.adapters.llm.port import DLLMGateway
-from agentex.domain.entities.agent_config import AgentConfig
+from agentex.domain.entities.agent_config import LLMConfig
+from agentex.domain.entities.agents import Agent, AgentStatus
+from agentex.domain.entities.hosted_actions_service import HostedActionsService
 from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage
 from agentex.domain.entities.tasks import Task
+from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.services.agents.agent_state_service import DAgentStateService
+from agentex.domain.workflows.create_agent_workflow import UpdateAgentStatusParams
+from agentex.domain.workflows.services.hosted_actions_service import start_hosted_actions_server, \
+    delete_hosted_actions_server
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
 
@@ -19,16 +25,18 @@ logger = make_logger(__name__)
 
 class InitTaskStateParams(BaseModel):
     task: Task
-    agent_config: AgentConfig
+    agent: Agent
 
 
 class DecideActionParams(BaseModel):
     task: Task
-    agent_config: AgentConfig
+    agent: Agent
+    hosted_actions_service: HostedActionsService
 
 
 class TakeActionParams(BaseModel):
     task: Task
+    hosted_actions_service: HostedActionsService
     tool_call_id: str
     tool_name: str
     tool_args: Dict[str, Any]
@@ -38,9 +46,11 @@ class AgentTaskActivities:
 
     def __init__(
         self,
+        agent_service: DAgentService,
         agent_state_service: DAgentStateService,
         llm_gateway: DLLMGateway,
     ):
+        self.agent_service = agent_service
         self.agent_state = agent_state_service
         self.llm = llm_gateway
 
@@ -58,17 +68,26 @@ class AgentTaskActivities:
     @activity.defn(name="decide_action")
     async def decide_action(self, params: DecideActionParams) -> LLMChoice:
         task = params.task
-        agent_config = params.agent_config
+        hosted_actions_service = params.hosted_actions_service
+        agent_spec = hosted_actions_service.agent_spec
 
         state = await self.agent_state.get(task.id)
-        completion_args = {
-            **agent_config.llm_config.to_dict(
-                exclude_unset=True,
-                exclude_none=True,
-            ),
-            "messages": state.messages,  # override existing messages
-        }
-        decision_response = await self.llm.acompletion(**completion_args)
+        completion_args = LLMConfig(
+            model=agent_spec.model,
+            messages=state.messages,
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": action_spec.name,
+                        "description": action_spec.description,
+                        "parameters": action_spec.parameters,
+                    }
+                }
+                for action_name, action_spec in agent_spec.actions.items()
+            ]
+        )
+        decision_response = await self.llm.acompletion(**completion_args.to_dict())
         await self.agent_state.messages.append(
             task_id=task.id,
             message=decision_response.message
@@ -76,21 +95,20 @@ class AgentTaskActivities:
         return decision_response
 
     @activity.defn(name="take_action")
-    async def take_action(self, params: TakeActionParams):
+    async def take_action(self, params: TakeActionParams) -> Optional[Dict]:
         task = params.task
+        hosted_actions_service = params.hosted_actions_service
+        tool_call_id = params.tool_call_id
         tool_name = params.tool_name
         tool_args = params.tool_args
-        tool_call_id = params.tool_call_id
-        state = await self.agent_state.get(task.id)
-        # Fetch tools from registry
-        # Implement tool logic here
-        get_weather = lambda x: {"results": "The weather is cloudy, windy, and rainy. Typhoon Krathon is imminent. Take cover."}
-        dummy_tool = lambda x: {"result": f"{tool_name} was executed, but is undefined."}
-        if tool_name == 'get_current_weather':
-            tool = get_weather
-        else:
-            tool = dummy_tool
-        tool_response = tool(tool_args)
+
+        tool_response = await self.agent_service.call_hosted_actions_service(
+            name=hosted_actions_service.service_name,
+            port=hosted_actions_service.service_port,
+            path=f"/{tool_name}",
+            method="POST",
+            payload=tool_args
+        )
         try:
             tool_call_message = ToolMessage(
                 content=json.dumps(tool_response),
@@ -108,7 +126,7 @@ class AgentTaskActivities:
 
 class AgentTaskWorkflowParams(BaseModel):
     task: Task
-    agent_config: AgentConfig
+    agent: Agent
 
 
 @workflow.defn
@@ -117,18 +135,32 @@ class AgentTaskWorkflow:
     @workflow.run
     async def run(self, params: AgentTaskWorkflowParams):
         task = params.task
-        agent_config = params.agent_config
+        agent = params.agent_config
 
         success = await workflow.execute_activity(
             activity="init_task_state",
             arg=InitTaskStateParams(
                 task=task,
-                agent_config=agent_config,
+                agent=agent,
             ),
             start_to_close_timeout=timedelta(seconds=60),
             retry_policy=RetryPolicy(maximum_attempts=5),
         )
         logger.info(f"Task state initialized: {success}")
+
+        hosted_actions_service = await start_hosted_actions_server(agent=agent)
+
+        # Set the agent status to READY
+        await workflow.execute_activity(
+            activity="update_agent_status",
+            arg=UpdateAgentStatusParams(
+                agent=agent,
+                status=AgentStatus.ACTIVE,
+                reason=f"Agent actions have been spun up and agent is active.",
+            ),
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
 
         content = None
         finish_reason = None
@@ -138,7 +170,8 @@ class AgentTaskWorkflow:
                 activity="decide_action",
                 arg=DecideActionParams(
                     task=task,
-                    agent_config=agent_config,
+                    agent=agent,
+                    hosted_actions_service=hosted_actions_service,
                 ),
                 start_to_close_timeout=timedelta(seconds=60),
                 retry_policy=RetryPolicy(maximum_attempts=5),
@@ -161,6 +194,7 @@ class AgentTaskWorkflow:
                             activity="take_action",
                             arg=TakeActionParams(
                                 task=task,
+                                hosted_actions_service=hosted_actions_service,
                                 tool_call_id=tool_call.id,
                                 tool_name=tool_call.function.name,
                                 tool_args=json.loads(tool_call.function.arguments),
@@ -173,5 +207,26 @@ class AgentTaskWorkflow:
 
             # Wait for all tool activities to complete
             await asyncio.gather(*take_action_activities)
+
+        await workflow.execute_activity(
+            activity="update_agent_status",
+            arg=UpdateAgentStatusParams(
+                agent=agent,
+                status=AgentStatus.IDLE,
+                reason="Agent has returned to idle state until it receives its next task.",
+            ),
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+
+        # When finished, delete the hosted action server. It will get recreated when the next task
+        # is submitted
+        # TODO: Don't outright delete this, schedule it for deletion, that way if the next task is requested
+        #   in short succession, this doesn't get cleaned up.
+        #   Also, allow for the server to be configured to be persistent if the user desired warm execution times.
+        await delete_hosted_actions_server(
+            service_name=hosted_actions_service.service_name,
+            deployment_name=hosted_actions_service.deployment_name,
+        )
 
         return {"status": "completed", "content": content}

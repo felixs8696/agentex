@@ -1,5 +1,4 @@
 import shutil
-import tarfile
 import tempfile
 from pathlib import Path
 from typing import Optional, List, Annotated
@@ -7,18 +6,13 @@ from typing import Optional, List, Annotated
 from fastapi import Depends, UploadFile
 
 from agentex.adapters.async_runtime.adapter_temporal import DTemporalGateway
-from agentex.api.schemas.agents import CreateAgentRequest
 from agentex.config.dependencies import DEnvironmentVariables
-from agentex.domain.entities.actions import Action
 from agentex.domain.entities.agents import Agent, AgentStatus
-from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agents.action_repository import DActionRepository
 from agentex.domain.services.agents.agent_repository import DAgentRepository
-from agentex.domain.use_cases.actions_use_case import TarfileError
 from agentex.domain.workflows.constants import BUILD_AGENT_TASK_QUEUE
 from agentex.domain.workflows.create_agent_workflow import CreateAgentWorkflow, CreateAgentWorkflowParams
 from agentex.utils.ids import orm_id
-from agentex.utils.json_schema import validate_payload, JSONSchemaValidationError
 from agentex.utils.logging import make_logger
 
 logger = make_logger(__name__)

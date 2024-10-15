@@ -1,10 +1,9 @@
-import json
 import sys
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Optional, Dict, Annotated, Any, List
+from typing import Optional, Dict
 
-from fastapi import FastAPI, Form, UploadFile, File, Body, Depends
+from fastapi import FastAPI, UploadFile, File, Body
 from fastapi import Request
 from fastapi import status
 from fastapi.exception_handlers import http_exception_handler
@@ -12,12 +11,10 @@ from fastapi.exceptions import RequestValidationError, HTTPException
 from starlette.responses import Response
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
 
-from agentex.api.schemas.actions import CreateActionResponse, CreateActionRequest, GetActionResponse
 from agentex.api.schemas.agents import CreateAgentResponse, CreateAgentRequest
 from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest, GetTaskResponse
 from agentex.config import dependencies
 from agentex.domain.exceptions import GenericException
-from agentex.domain.use_cases.actions_use_case import DActionsUseCase
 from agentex.domain.use_cases.agents_use_case import DAgentsUseCase
 from agentex.domain.use_cases.tasks_use_case import DTaskUseCase
 from agentex.utils.logging import make_logger
@@ -176,72 +173,3 @@ async def get_task(
 ) -> GetTaskResponse:
     get_task_response = await task_use_case.get(task_id)
     return get_task_response
-
-
-@app.post(
-    path="/actions",
-    response_model=CreateActionResponse,
-    tags=[RouteTag.ACTIONS],
-)
-async def create_action(
-    code_package: Annotated[UploadFile, File()],
-    actions_use_case: DActionsUseCase,
-    name: str = Form(
-        ...,
-        description="The name of the action."
-    ),
-    description: str = Form(
-        ...,
-        description="The description of the action."
-    ),
-    parameters: str = Form(
-        ...,
-        description="The serialized JSON schema describing the parameters that the action takes in"
-    ),
-    test_payload: str = Form(
-        ...,
-        description="The serialized payload to use when testing the action."
-    ),
-    version: str = Form(
-        ...,
-        description="The version of the action."
-    ),
-    agents: Optional[str] = Form(
-        None,
-        description="The serialized list of agents, by name, that can use this action."
-    ),
-):
-    """
-    Endpoint to handle creating an action with a code package.
-    """
-    parameters_dict = json.loads(parameters)
-    test_payload_dict = json.loads(test_payload)
-    agents_list = json.loads(agents)
-
-    action = await actions_use_case.create(
-        name=name,
-        description=description,
-        parameters=parameters_dict,
-        code_package=code_package,
-        test_payload=test_payload_dict,
-        version=version,
-        agents=agents_list,
-    )
-    return CreateActionResponse.from_orm(action)
-
-
-@app.get(
-    path="/actions/{action_id}",
-    response_model=GetActionResponse,
-    tags=[RouteTag.ACTIONS],
-)
-async def get_action(
-    action_id: str,
-    actions_use_case: DActionsUseCase,
-):
-    """
-    Endpoint to get an action by its ID.
-    """
-    action = await actions_use_case.get(id=action_id)
-    return CreateActionResponse.from_orm(action)
-
