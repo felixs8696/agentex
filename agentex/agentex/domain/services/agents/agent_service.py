@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Tuple
+from typing import Annotated, Optional, Tuple, Union
 
 from fastapi import Depends
 from kubernetes_asyncio import client as k8s_client
@@ -111,8 +111,8 @@ class AgentService:
         path: str,
         method: str = "GET",
         payload: Optional[dict] = None
-    ):
-        agent_spec = await self.k8s.call_service(
+    ) -> Union[dict, list, str, int, float, bool]:
+        return await self.k8s.call_service(
             namespace=self.agents_namespace,
             name=name,
             port=80,
@@ -120,7 +120,6 @@ class AgentService:
             method=method,
             payload=payload
         )
-        return AgentSpec.from_dict(agent_spec)
 
     async def delete_hosted_actions_deployment(self, name: str):
         return await self.k8s.delete_deployment(namespace=self.agents_namespace, name=name)

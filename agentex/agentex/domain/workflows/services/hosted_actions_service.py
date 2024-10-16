@@ -1,18 +1,19 @@
 import asyncio
 from datetime import timedelta
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List, Union, Dict
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from agentex.config.dependencies import DEnvironmentVariables
+from agentex.domain.entities.actions import Action
 from agentex.domain.entities.agent_spec import AgentSpec
 from agentex.domain.entities.agents import Agent, AgentStatus
 from agentex.domain.entities.deployment import Deployment, DeploymentStatus
 from agentex.domain.entities.hosted_actions_service import HostedActionsService
 from agentex.domain.entities.job import Job, JobStatus
 from agentex.domain.entities.service import Service
-from agentex.domain.exceptions import ServiceError
+from agentex.domain.exceptions import ServiceError, ClientError
 from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.workflows.services.hosted_actions.workflow_entities import CreateHostedActionsDeploymentParams, \
     CallHostedActionsServiceParams, UpdateAgentStatusParams, BuildHostedActionsParams
@@ -103,7 +104,7 @@ class HostedActionsServiceActivities:
     async def call_hosted_actions_service(
         self,
         params: CallHostedActionsServiceParams,
-    ) -> AgentSpec:
+    ) -> Union[dict, list, str, int, float, bool]:
         name = params.name
         path = params.path
         method = params.method
@@ -263,25 +264,25 @@ async def create_hosted_actions_deployment(
 
         retries += 1
 
-    # if not complete:
-    #     if deployment:
-    #         try:
-    #             await execute_workflow_activity(
-    #                 activity_name="delete_hosted_actions_deployment",
-    #                 arg=deployment.name,
-    #                 start_to_close_timeout=timedelta(seconds=10),
-    #                 retry_policy=RetryPolicy(maximum_attempts=3),
-    #             )
-    #         finally:
-    #             raise ServiceError(
-    #                 f"Error creating agent action deployment: "
-    #                 f"Deployment '{deployment.name}' timed out. Please try again."
-    #             )
-    #     else:
-    #         raise ServiceError(
-    #             f"Error creating agent action deployment: "
-    #             f"Deployment not found. Please try again."
-    #         )
+    if not complete:
+        if deployment:
+            try:
+                await execute_workflow_activity(
+                    activity_name="delete_hosted_actions_deployment",
+                    arg=deployment.name,
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
+                )
+            finally:
+                raise ServiceError(
+                    f"Error creating agent action deployment: "
+                    f"Deployment '{deployment.name}' timed out. Please try again."
+                )
+        else:
+            raise ServiceError(
+                f"Error creating agent action deployment: "
+                f"Deployment not found. Please try again."
+            )
 
     workflow.logger.info(f"Agent action deployment created: {deployment}")
 
@@ -319,25 +320,25 @@ async def create_hosted_actions_service(name: str) -> Service:
 
         retries += 1
 
-    # if not complete:
-    #     if service:
-    #         try:
-    #             await execute_workflow_activity(
-    #                 activity_name="delete_hosted_actions_service",
-    #                 arg=service.name,
-    #                 start_to_close_timeout=timedelta(seconds=10),
-    #                 retry_policy=RetryPolicy(maximum_attempts=3),
-    #             )
-    #         finally:
-    #             raise ServiceError(
-    #                 f"Error creating agent action service: "
-    #                 f"Service '{service.name}' timed out. Please try again."
-    #             )
-    #     else:
-    #         raise ServiceError(
-    #             f"Error creating agent action service: "
-    #             f"Service not found. Please try again."
-    #         )
+    if not complete:
+        if service:
+            try:
+                await execute_workflow_activity(
+                    activity_name="delete_hosted_actions_service",
+                    arg=service.name,
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
+                )
+            finally:
+                raise ServiceError(
+                    f"Error creating agent action service: "
+                    f"Service '{service.name}' timed out. Please try again."
+                )
+        else:
+            raise ServiceError(
+                f"Error creating agent action service: "
+                f"Service not found. Please try again."
+            )
 
     workflow.logger.info(f"Agent action service created: {service}")
 
@@ -380,6 +381,38 @@ async def poll_service_for_agent_spec(
     return agent_spec
 
 
+async def validate_hosted_actions_server_with_test_payloads(
+    service_name: str,
+    actions: List[Action]
+):
+    """
+    Send test payloads to the hosted actions server in parallel and
+    throw an error if any response is not 200. Otherwise, log and continue.
+    """
+    # List to store all test activities
+    test_activities = []
+
+    # Send test payloads to the hosted actions server
+    for action in actions:
+        test_activity = asyncio.create_task(
+            execute_workflow_activity(
+                activity_name="call_hosted_actions_service",
+                arg=CallHostedActionsServiceParams(
+                    name=service_name,
+                    path=f"/{action.name}",
+                    method="POST",
+                    payload=action.test_payload,
+                ),
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+        )
+        test_activities.append(test_activity)
+
+    # Await and collect results from all tasks, errors will be raised if any response is not 200
+    await asyncio.gather(*test_activities)
+
+
 async def start_hosted_actions_server(agent: Agent) -> HostedActionsService:
     # Create the agent deployment and service to fetch the agent spec
     server_name = f"{agent.name}-{agent.version}".replace(".", "-").replace("_", "-")
@@ -392,13 +425,13 @@ async def start_hosted_actions_server(agent: Agent) -> HostedActionsService:
     try:
         service = await create_hosted_actions_service(name=server_name)
     except Exception as error:
-        # # Clean up the deployment if the service creation fails
-        # await execute_workflow_activity(
-        #     activity_name="delete_hosted_actions_deployment",
-        #     arg=deployment.name,
-        #     start_to_close_timeout=timedelta(seconds=10),
-        #     retry_policy=RetryPolicy(maximum_attempts=3),
-        # )
+        # Clean up the deployment if the service creation fails
+        await execute_workflow_activity(
+            activity_name="delete_hosted_actions_deployment",
+            arg=deployment.name,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
         raise error
 
     try:
@@ -406,17 +439,17 @@ async def start_hosted_actions_server(agent: Agent) -> HostedActionsService:
             name=server_name,
         )
     except Exception as error:
-        # # Clean up the deployment and service if the polling fails
-        # await delete_hosted_actions_server(
-        #     service_name=service.name,
-        #     deployment_name=deployment.name,
-        # )
+        # Clean up the deployment and service if the polling fails
+        await delete_hosted_actions_server(
+            service_name=service.name,
+            deployment_name=deployment.name,
+        )
         raise error
 
     return HostedActionsService(
         service_name=service.name,
         service_namespace=service.namespace,
-        service_port=agent.action_service_port,
+        service_port=80,
         deployment_name=deployment.name,
         deployment_namespace=service.namespace,
         agent_spec=agent_spec

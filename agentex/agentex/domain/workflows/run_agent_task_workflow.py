@@ -79,12 +79,12 @@ class AgentTaskActivities:
                 {
                     "type": "function",
                     "function": {
-                        "name": action_spec.name,
-                        "description": action_spec.description,
-                        "parameters": action_spec.parameters,
+                        "name": action.name,
+                        "description": action.description,
+                        "parameters": action.parameters,
                     }
                 }
-                for action_spec in agent_spec.actions
+                for action in agent_spec.actions
             ]
         )
         decision_response = await self.llm.acompletion(**completion_args.to_dict())

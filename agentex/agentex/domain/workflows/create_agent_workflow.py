@@ -1,15 +1,13 @@
 from datetime import timedelta
-from typing import List
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from agentex.config.dependencies import DEnvironmentVariables
-from agentex.domain.entities.actions import Action
 from agentex.domain.entities.agents import Agent, AgentStatus
 from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.workflows.services.hosted_actions_service import build_and_push_agent, \
-    start_hosted_actions_server
+    start_hosted_actions_server, validate_hosted_actions_server_with_test_payloads, delete_hosted_actions_server
 from agentex.domain.workflows.utils.activities import execute_workflow_activity
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
@@ -22,11 +20,6 @@ class CreateAgentWorkflowParams(BaseModel):
     agent_tar_path: str
 
 
-class CreateAgentActions(BaseModel):
-    agent: Agent
-    actions: List[Action]
-
-
 class CreateAgentActivities:
 
     def __init__(
@@ -36,19 +29,6 @@ class CreateAgentActivities:
     ):
         self.agent_service = agent_service
         self.build_contexts_path = environment_variables.BUILD_CONTEXTS_PATH
-
-    @activity.defn(name="create_actions")
-    async def create_actions(
-        self,
-        params: CreateAgentActions,
-    ) -> List[Action]:
-        agent = params.agent
-        actions = params.actions
-
-        return await self.agent_service.create_actions(
-            agent=agent,
-            actions=actions,
-        )
 
     @activity.defn(name="update_agent")
     async def update_agent(
@@ -64,11 +44,8 @@ class CreateAgentWorkflow:
     @workflow.run
     async def run(self, params: CreateAgentWorkflowParams):
         agent = params.agent
-        agent_id = params.agent.id
         agent_name = params.agent.name
-        agent_description = params.agent.description
         agent_version = params.agent.version
-        action_service_port = params.agent.action_service_port
 
         agent_tar_path = params.agent_tar_path
 
@@ -100,7 +77,21 @@ class CreateAgentWorkflow:
         agent.status_reason = "Agent built and ready to receive tasks."
         agent = await _update_agent(agent)
 
-        workflow.logger.info(f"Agent fully resolved: {agent}")
+        await validate_hosted_actions_server_with_test_payloads(
+            service_name=hosted_actions_service.service_name,
+            actions=agent.actions,
+        )
+
+        workflow.logger.info("Agent actions validated with test payloads.")
+
+        await delete_hosted_actions_server(
+            service_name=hosted_actions_service.service_name,
+            deployment_name=hosted_actions_service.deployment_name,
+        )
+
+        workflow.logger.info("Agent actions service cleaned up.")
+
+        workflow.logger.info(f"Agent fully built and ready to receive tasks: {agent}")
 
         return agent
         # except Exception as error:

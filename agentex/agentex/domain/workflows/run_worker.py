@@ -188,7 +188,6 @@ async def run_create_agent_worker(
                 CreateAgentWorkflow,
             ],
             activities=[
-                create_agent_activities.create_actions,
                 create_agent_activities.update_agent,
                 hosted_actions_service_activities.build_hosted_actions_service,
                 hosted_actions_service_activities.get_build_job,

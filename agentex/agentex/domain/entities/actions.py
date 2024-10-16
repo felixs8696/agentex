@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from pydantic import Field
 
@@ -6,10 +6,10 @@ from agentex.utils.model_utils import BaseModel
 
 
 class Action(BaseModel):
-    id: str = Field(
-        ...,
-        title="Unique Action ID",
-    )
+    """
+    Every Agent server will expose a REST API at the root route that will allow Agentex to fetch the agent's metadata.
+    This includes a list of actions that the agent can perform which are defined by this spec.
+    """
     name: str = Field(
         ...,
         description="The name of the action. If you try to create a new action with the same name as an existing "
@@ -23,7 +23,7 @@ class Action(BaseModel):
         ...,
         description="The JSON schema describing the parameters that the action takes in"
     )
-    test_payload: Dict[str, Any] = Field(
-        ...,
+    test_payload: Optional[Dict[str, Any]] = Field(
+        None,
         description="The payload to use when testing the action."
     )

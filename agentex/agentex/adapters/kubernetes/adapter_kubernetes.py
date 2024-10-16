@@ -194,7 +194,7 @@ class KubernetesGateway(KubernetesPort):
         elif job_status.active:
             status = JobStatus.RUNNING
         else:
-            status = JobStatus.PENDING if job_status.start_time is None else JobStatus.UNKNOWN
+            status = JobStatus.PENDING
 
         return Job(
             name=job.metadata.name,
