@@ -8,7 +8,6 @@ from fastapi import Depends, UploadFile
 from agentex.adapters.async_runtime.adapter_temporal import DTemporalGateway
 from agentex.config.dependencies import DEnvironmentVariables
 from agentex.domain.entities.agents import Agent, AgentStatus
-from agentex.domain.services.agents.action_repository import DActionRepository
 from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.domain.workflows.constants import BUILD_AGENT_TASK_QUEUE
 from agentex.domain.workflows.create_agent_workflow import CreateAgentWorkflow, CreateAgentWorkflowParams
@@ -23,12 +22,10 @@ class AgentsUseCase:
     def __init__(
         self,
         agent_repository: DAgentRepository,
-        action_repository: DActionRepository,
         async_runtime: DTemporalGateway,
         environment_variables: DEnvironmentVariables,
     ):
         self.agent_repo = agent_repository
-        self.action_repo = action_repository
         self.async_runtime = async_runtime
         self.build_contexts_path = environment_variables.BUILD_CONTEXTS_PATH
         self.task_queue = BUILD_AGENT_TASK_QUEUE

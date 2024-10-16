@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, List, Tuple
+from typing import Annotated, Optional, Tuple
 
 from fastapi import Depends
 from kubernetes_asyncio import client as k8s_client
@@ -6,13 +6,11 @@ from kubernetes_asyncio import client as k8s_client
 from agentex.adapters.containers.build_adapter_kaniko import DKanikoBuildGateway
 from agentex.adapters.kubernetes.adapter_kubernetes import DKubernetesGateway
 from agentex.config.dependencies import DEnvironmentVariables
-from agentex.domain.entities.actions import Action
 from agentex.domain.entities.agent_spec import AgentSpec
 from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.deployment import Deployment
 from agentex.domain.entities.job import Job
 from agentex.domain.entities.service import Service
-from agentex.domain.services.agents.action_repository import DActionRepository
 from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.utils.logging import make_logger
 
@@ -23,29 +21,17 @@ class AgentService:
     def __init__(
         self,
         build_gateway: DKanikoBuildGateway,
-        action_repository: DActionRepository,
         agent_repository: DAgentRepository,
         kubernetes_gateway: DKubernetesGateway,
         environment_variables: DEnvironmentVariables,
     ):
         self.k8s = kubernetes_gateway
         self.build_gateway = build_gateway
-        self.action_repo = action_repository
         self.agent_repo = agent_repository
         self.registry_url = environment_variables.BUILD_REGISTRY_URL
         self.build_registry_secret_name = environment_variables.BUILD_REGISTRY_SECRET_NAME
         self.agents_namespace = environment_variables.AGENTS_NAMESPACE
         self.actions_build_namespace = "default"
-
-    async def create_actions(self, agent: Agent, actions: List[Action]) -> List[Action]:
-        actions = await self.action_repo.batch_create(items=actions)
-
-        await self.agent_repo.associate_agents_with_actions(
-            agents=[agent],
-            actions=actions,
-        )
-
-        return actions
 
     async def create_hosted_actions_deployment(
         self,

@@ -13,7 +13,6 @@ from agentex.adapters.kv_store.adapter_redis import RedisRepository
 from agentex.adapters.llm.adapter_litellm import LiteLLMGateway
 from agentex.config.dependencies import GlobalDependencies, database_async_read_write_session_maker
 from agentex.config.environment_variables import EnvironmentVariables
-from agentex.domain.services.agents.action_repository import ActionRepository
 from agentex.domain.services.agents.agent_repository import AgentRepository
 from agentex.domain.services.agents.agent_service import AgentService
 from agentex.domain.services.agents.agent_state_repository import AgentStateRepository
@@ -61,12 +60,8 @@ async def run_agent_task_worker(
         async_read_write_session_maker = database_async_read_write_session_maker(
             db_async_read_write_engine=global_dependencies.database_async_read_write_engine,
         )
-        action_repository = ActionRepository(
-            async_read_write_session_maker=async_read_write_session_maker,
-        )
         agent_repository = AgentRepository(
             async_read_write_session_maker=async_read_write_session_maker,
-            action_repository=action_repository,
         )
         k8s_gateway = KubernetesGateway(
             http_gateway=HttpxGateway(),
@@ -79,7 +74,6 @@ async def run_agent_task_worker(
         agent_service = AgentService(
             build_gateway=build_gateway,
             agent_repository=agent_repository,
-            action_repository=action_repository,
             kubernetes_gateway=k8s_gateway,
             environment_variables=environment_variables,
         )
@@ -155,12 +149,8 @@ async def run_create_agent_worker(
         async_read_write_session_maker = database_async_read_write_session_maker(
             db_async_read_write_engine=global_dependencies.database_async_read_write_engine,
         )
-        action_repository = ActionRepository(
-            async_read_write_session_maker=async_read_write_session_maker,
-        )
         agent_repository = AgentRepository(
             async_read_write_session_maker=async_read_write_session_maker,
-            action_repository=action_repository,
         )
         k8s_gateway = KubernetesGateway(
             http_gateway=HttpxGateway(),
@@ -173,7 +163,6 @@ async def run_create_agent_worker(
         agent_service = AgentService(
             build_gateway=build_gateway,
             agent_repository=agent_repository,
-            action_repository=action_repository,
             kubernetes_gateway=k8s_gateway,
             environment_variables=environment_variables,
         )

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import List, Optional, Tuple
+from typing import List
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -11,7 +11,6 @@ from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.workflows.services.hosted_actions_service import build_and_push_agent, \
     start_hosted_actions_server
 from agentex.domain.workflows.utils.activities import execute_workflow_activity
-from agentex.utils.ids import orm_id
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
 
@@ -96,35 +95,12 @@ class CreateAgentWorkflow:
 
         agent.instructions = agent_spec.instructions
         agent.model = agent_spec.model
+        agent.actions = agent_spec.actions
         agent.status = AgentStatus.IDLE
         agent.status_reason = "Agent built and ready to receive tasks."
         agent = await _update_agent(agent)
 
-        actions = [
-            Action(
-                id=orm_id(),
-                name=action_spec.name,
-                description=action_spec.description,
-                parameters=action_spec.parameters,
-                test_payload=action_spec.test_payload,
-                version=action_spec.version,
-            )
-            for action_spec in agent_spec.actions
-        ]
-
-        # Create actions now that the build was successful
-        actions = await execute_workflow_activity(
-            activity_name="create_actions",
-            arg=CreateAgentActions(
-                agent=agent,
-                actions=actions,
-            ),
-            start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-            response_model=Action,
-        )
-
-        workflow.logger.info(f"Actions created: {actions}")
+        workflow.logger.info(f"Agent fully resolved: {agent}")
 
         return agent
         # except Exception as error:

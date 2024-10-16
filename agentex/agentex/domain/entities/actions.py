@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from pydantic import Field
 
@@ -26,8 +26,4 @@ class Action(BaseModel):
     test_payload: Dict[str, Any] = Field(
         ...,
         description="The payload to use when testing the action."
-    )
-    version: str = Field(
-        ...,
-        description="The version of the action."
     )

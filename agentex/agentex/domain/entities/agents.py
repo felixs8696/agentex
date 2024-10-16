@@ -1,8 +1,9 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import Field
 
+from agentex.domain.entities.action_spec import ActionSpec
 from agentex.utils.model_utils import BaseModel
 
 
@@ -58,13 +59,13 @@ class Agent(BaseModel):
         None,
         description="The instructions for the agent."
     )
+    actions: Optional[List[ActionSpec]] = Field(
+        default=None,
+        description="The actions that the agent can perform."
+    )
     status: AgentStatus = Field(
         AgentStatus.UNKNOWN,
         description="The status of the action, indicating if it's building, ready, failed, etc."
-    )
-    action_service_port: int = Field(
-        ...,
-        description="The port that the action service will run on."
     )
     status_reason: Optional[str] = Field(
         None,
