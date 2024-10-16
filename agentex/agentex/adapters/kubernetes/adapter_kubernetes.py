@@ -1,9 +1,8 @@
 from typing import Annotated, Optional, Dict
 
-import httpx
 from fastapi import Depends
 from kubernetes_asyncio import client
-from kubernetes_asyncio.client import V1Job, ApiClient, ApiException, V1Deployment
+from kubernetes_asyncio.client import V1Job, ApiClient, ApiException, V1Deployment, V1Service
 
 from agentex.adapters.http.adapter_httpx import DHttpxGateway
 from agentex.adapters.kubernetes.port import KubernetesPort
@@ -35,20 +34,35 @@ class KubernetesGateway(KubernetesPort):
         self.http_gateway = http_gateway
         self.build_registry_secret_name = environment_variables.BUILD_REGISTRY_SECRET_NAME
 
-    async def create_job(self, namespace: str, job: V1Job) -> Job:
-        async with ApiClient() as api:
-            batch_v1 = client.BatchV1Api(api)
-            job = await batch_v1.create_namespaced_job(
-                body=job,
-                namespace=namespace
-            )
-        return self._convert_job_to_entity(job)
+    async def create_job(self, namespace: str, job: V1Job, override: bool = False) -> Job:
+        try:
+            async with ApiClient() as api:
+                batch_v1 = client.BatchV1Api(api)
+                job = await batch_v1.create_namespaced_job(
+                    body=job,
+                    namespace=namespace
+                )
+            return self._convert_job_to_entity(job)
+        except ApiException as error:
+            if error.status == 409:
+                if override:
+                    await self.delete_job(namespace=namespace, name=job.metadata.name)
+                    return await self.create_job(namespace=namespace, job=job)
+                else:
+                    job = await self.get_job(namespace=namespace, name=job.metadata.name)
+                    return job
+            raise KubernetesError(f"Error creating job {job.metadata.name}: {error}") from error
 
     async def get_job(self, namespace: str, name: str) -> Optional[Job]:
-        async with client.ApiClient() as api:
-            batch_v1 = client.BatchV1Api(api)
-            job = await batch_v1.read_namespaced_job(name=name, namespace=namespace)
-            return self._convert_job_to_entity(job)
+        try:
+            async with client.ApiClient() as api:
+                batch_v1 = client.BatchV1Api(api)
+                job = await batch_v1.read_namespaced_job(name=name, namespace=namespace)
+                return self._convert_job_to_entity(job)
+        except ApiException as error:
+            if error.status == 404:
+                return None
+            raise KubernetesError(f"Error getting job {name}: {error}") from error
 
     async def delete_job(self, namespace: str, name: str) -> None:
         async with ApiClient() as api:
@@ -58,68 +72,38 @@ class KubernetesGateway(KubernetesPort):
             except ApiException as error:
                 raise KubernetesError(f"Error deleting job {name}: {error}") from error
 
-    async def create_deployment(
-        self,
-        namespace: str,
-        name: str,
-        image: str,
-        container_port: int = 8000,
-        replicas: Optional[int] = 1
-    ) -> Deployment:
-        async with ApiClient() as api:
-            apps_v1 = client.AppsV1Api(api)
-            deployment = await apps_v1.create_namespaced_deployment(
-                body=client.V1Deployment(
-                    api_version="apps/v1",
-                    kind="Deployment",
-                    metadata=client.V1ObjectMeta(name=name),
-                    spec=client.V1DeploymentSpec(
-                        replicas=replicas,
-                        selector={'matchLabels': {'app': name}},
-                        template=client.V1PodTemplateSpec(
-                            metadata=client.V1ObjectMeta(labels={'app': name}),
-                            spec=client.V1PodSpec(
-                                containers=[
-                                    client.V1Container(
-                                        name=name,
-                                        image=image,
-                                        image_pull_policy="IfNotPresent",
-                                        ports=[client.V1ContainerPort(container_port=container_port)],
-                                        env=[
-                                            client.V1EnvVar(
-                                                name="DOCKER_CONFIG",
-                                                value="/root/.docker"
-                                            )
-                                        ],
-                                        volume_mounts=[
-                                            client.V1VolumeMount(
-                                                name="build-registry-secret",  # Mount the existing PVC
-                                                mount_path="/root/.docker"  # Mount the PVC where the zip is located
-                                            ),
-                                        ]
-                                    )
-                                ],
-                                volumes=[
-                                    client.V1Volume(
-                                        name="build-registry-secret",
-                                        secret=client.V1SecretVolumeSource(
-                                            secret_name=self.build_registry_secret_name,
-                                        ),
-                                    ),
-                                ],
-                            )
-                        )
-                    )
-                ),
-                namespace=namespace
-            )
-        return self._convert_deploy_to_entity(deployment)
+    async def create_deployment(self, namespace: str, deployment: V1Deployment, override: bool = False) -> Deployment:
+        try:
+            async with ApiClient() as api:
+                apps_v1 = client.AppsV1Api(api)
+                v1_deployment = await apps_v1.create_namespaced_deployment(
+                    body=deployment,
+                    namespace=namespace
+                )
+            return self._convert_deploy_to_entity(v1_deployment)
+        except ApiException as error:
+            if error.status == 409:
+                if override:
+                    await self.delete_deployment(namespace=namespace, name=deployment.metadata.name)
+                    return await self.create_deployment(namespace=namespace, deployment=deployment)
+                else:
+                    v1_deployment = await self.get_deployment(namespace=namespace, name=deployment.metadata.name)
+                    return v1_deployment
+            raise KubernetesError(f"Error creating deployment {deployment.metadata.name}: {error}") from error
 
     async def get_deployment(self, namespace: str, name: str) -> Optional[Deployment]:
-        async with ApiClient() as api:
-            apps_v1 = client.AppsV1Api(api)
-            deployment = await apps_v1.read_namespaced_deployment(name=name, namespace=namespace)
-            return self._convert_deploy_to_entity(deployment)
+        try:
+            async with ApiClient() as api:
+                apps_v1 = client.AppsV1Api(api)
+                v1_deployment = await apps_v1.read_namespaced_deployment(name=name, namespace=namespace)
+        except ApiException as error:
+            logger.info("Error getting deployment %s: %s", name, error)
+            logger.info(f"Status: {error.status}")
+            if error.status == 404:
+                return None
+            raise KubernetesError(f"Error getting deployment {name}: {error}") from error
+
+        return self._convert_deploy_to_entity(v1_deployment)
 
     async def delete_deployment(self, namespace: str, name: str) -> None:
         """Delete the deployment by name."""
@@ -130,41 +114,36 @@ class KubernetesGateway(KubernetesPort):
             except ApiException as error:
                 raise KubernetesError(f"Error deleting deployment {name}: {error}") from error
 
-    async def create_service(
-        self,
-        namespace: str,
-        name: str,
-        service_port: int = 80,
-        container_port: int = 8000,
-    ) -> Service:
+    async def create_service(self, namespace: str, service: V1Service, override: bool = False) -> Service:
         # Create the service
-        async with ApiClient() as api:
-            core_v1 = client.CoreV1Api(api)
-            service = await core_v1.create_namespaced_service(
-                body=client.V1Service(
-                    api_version="v1",
-                    kind="Service",
-                    metadata=client.V1ObjectMeta(name=name),
-                    spec=client.V1ServiceSpec(
-                        selector={'app': name},
-                        ports=[
-                            client.V1ServicePort(
-                                port=service_port,
-                                target_port=container_port,
-                                protocol="TCP"
-                            )
-                        ]
-                    )
-                ),
-                namespace=namespace
-            )
-        return self._convert_service_to_entity(service)
+        try:
+            async with ApiClient() as api:
+                core_v1 = client.CoreV1Api(api)
+                v1_service = await core_v1.create_namespaced_service(
+                    body=service,
+                    namespace=namespace
+                )
+            return self._convert_service_to_entity(v1_service)
+        except ApiException as error:
+            if error.status == 409:
+                if override:
+                    await self.delete_service(namespace=namespace, name=service.metadata.name)
+                    return await self.create_service(namespace=namespace, service=service)
+                else:
+                    v1_service = await self.get_service(namespace=namespace, name=service.metadata.name)
+                    return v1_service
+            raise KubernetesError(f"Error creating service {service.metadata.name}: {error}") from error
 
     async def get_service(self, namespace: str, name: str) -> Optional[Service]:
-        async with ApiClient() as api:
-            core_v1 = client.CoreV1Api(api)
-            service = await core_v1.read_namespaced_service(name=name, namespace=namespace)
-            return self._convert_service_to_entity(service)
+        try:
+            async with ApiClient() as api:
+                core_v1 = client.CoreV1Api(api)
+                service = await core_v1.read_namespaced_service(name=name, namespace=namespace)
+                return self._convert_service_to_entity(service)
+        except ApiException as error:
+            if error.status == 404:
+                return None
+            raise KubernetesError(f"Error getting service {name}: {error}") from error
 
     async def delete_service(self, namespace: str, name: str) -> None:
         """Delete the service by name."""

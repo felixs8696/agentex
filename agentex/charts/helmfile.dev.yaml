@@ -25,26 +25,26 @@ releases:
           enabled: false
         grafana:
           enabled: false
-
-  - name: harbor
-    chart: harbor/harbor
-    namespace: harbor
-    values:
-      - expose:
-          type: clusterIP
-          tls:
-            enabled: false
-#            certSource: auto
-#            auto:
-#              commonName: harbor.harbor.svc.cluster.local
-#          clusterIP:
-#              name: harbor
-        externalURL: "http://harbor.harbor.svc.cluster.local:80"
-        persistence:
-          enabled: true
-          persistentVolumeClaim:
-            registry:
-              size: 10Gi
+#
+#  - name: harbor
+#    chart: harbor/harbor
+#    namespace: harbor
+#    values:
+#      - expose:
+#          type: clusterIP
+#          tls:
+#            enabled: false
+##            certSource: auto
+##            auto:
+##              commonName: harbor.harbor.svc.cluster.local
+##          clusterIP:
+##              name: harbor
+#        externalURL: "http://harbor.harbor.svc.cluster.local:80"
+#        persistence:
+#          enabled: true
+#          persistentVolumeClaim:
+#            registry:
+#              size: 10Gi
 
   - name: agentex-workers
     chart: ./agentex-workers

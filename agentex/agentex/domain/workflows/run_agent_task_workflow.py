@@ -8,15 +8,15 @@ from temporalio.common import RetryPolicy
 
 from agentex.adapters.llm.port import DLLMGateway
 from agentex.domain.entities.agent_config import LLMConfig
-from agentex.domain.entities.agents import Agent, AgentStatus
+from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.hosted_actions_service import HostedActionsService
 from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage
 from agentex.domain.entities.tasks import Task
 from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.services.agents.agent_state_service import DAgentStateService
-from agentex.domain.workflows.create_agent_workflow import UpdateAgentStatusParams
 from agentex.domain.workflows.services.hosted_actions_service import start_hosted_actions_server, \
     delete_hosted_actions_server, mark_agent_as_active, mark_agent_as_idle
+from agentex.domain.workflows.utils.activities import execute_workflow_activity
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
 
@@ -138,8 +138,8 @@ class AgentTaskWorkflow:
         agent = params.agent_config
 
         # Give the agent the initial task
-        success = await workflow.execute_activity(
-            activity="init_task_state",
+        success = await execute_workflow_activity(
+            activity_name="init_task_state",
             arg=InitTaskStateParams(
                 task=task,
                 agent=agent,
@@ -159,8 +159,8 @@ class AgentTaskWorkflow:
         finish_reason = None
         while finish_reason not in ("stop", "length", "content_filter"):
             # Execute decision activity
-            decision_response_dict = await workflow.execute_activity(
-                activity="decide_action",
+            decision_response = await execute_workflow_activity(
+                activity_name="decide_action",
                 arg=DecideActionParams(
                     task=task,
                     agent=agent,
@@ -168,8 +168,8 @@ class AgentTaskWorkflow:
                 ),
                 start_to_close_timeout=timedelta(seconds=60),
                 retry_policy=RetryPolicy(maximum_attempts=5),
+                response_model=LLMChoice,
             )
-            decision_response = LLMChoice.from_dict(decision_response_dict)
             finish_reason = decision_response.finish_reason
             decision = decision_response.message
             tool_calls = decision.tool_calls
@@ -183,8 +183,8 @@ class AgentTaskWorkflow:
             if decision.tool_calls:
                 for tool_call in tool_calls:
                     take_action_activity = asyncio.create_task(
-                        workflow.execute_activity(
-                            activity="take_action",
+                        execute_workflow_activity(
+                            activity_name="take_action",
                             arg=TakeActionParams(
                                 task=task,
                                 hosted_actions_service=hosted_actions_service,

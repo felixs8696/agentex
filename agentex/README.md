@@ -21,19 +21,26 @@ make install
 
 ## Development
 
-### Run the server
-
-# In on terminal
+### Start minikube
 ```commandline
-make dev
-kubectl port-forward service/agentex 5003:80 # If the port forwarding is attempted before the pod is ready
+minikube start
 ```
 
-# In other terminals
+### Install Helm charts and run the server
+
+#### In terminal
 ```commandline
-kubectl port-forward service/agentex 5003:80 # Allows access to Agentex through localhost:5003
-kubectl port-forward svc/harbor 8080:80 --namespace harbor # Allows access to harbor UI through localhost:8080
-kubectl port-forward svc/temporal-web 3000:8080 # Allows access to Temporal Web through localhost:3000
+make dev
+make port-forward # If the port forwarding is attempted before the pod is ready
+```
+
+#### Create secret to push and pull from private dockerhub registry
+```commandline
+kubectl create secret docker-registry hosted-actions-regcred \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username=<username> \
+  --docker-password=<personal_access_token> \
+  --docker-email=<email>
 ```
 
 ### Helm Charts

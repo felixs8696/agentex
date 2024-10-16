@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Optional, Dict
 
-from kubernetes_asyncio.client import V1Job
+from kubernetes_asyncio.client import V1Job, V1Deployment, V1Service
 
 from agentex.domain.entities.deployment import Deployment
 from agentex.domain.entities.job import Job
@@ -11,7 +11,7 @@ from agentex.domain.entities.service import Service
 class KubernetesPort(ABC):
 
     @abstractmethod
-    async def create_job(self, job_name: str, job: V1Job) -> Job:
+    async def create_job(self, namespace: str, job: V1Job) -> Job:
         pass
 
     @abstractmethod
@@ -23,14 +23,7 @@ class KubernetesPort(ABC):
         pass
 
     @abstractmethod
-    async def create_deployment(
-        self,
-        namespace: str,
-        name: str,
-        image: str,
-        container_port: int = 8000,
-        replicas: Optional[int] = 1
-    ) -> Deployment:
+    async def create_deployment(self, namespace: str, deployment: V1Deployment) -> Deployment:
         pass
 
     @abstractmethod
@@ -42,13 +35,7 @@ class KubernetesPort(ABC):
         pass
 
     @abstractmethod
-    async def create_service(
-        self,
-        namespace: str,
-        name: str,
-        service_port: int = 80,
-        container_port: int = 8000,
-    ) -> Service:
+    async def create_service(self, namespace: str, service: V1Service) -> Service:
         pass
 
     @abstractmethod

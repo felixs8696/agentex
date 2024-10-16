@@ -52,7 +52,7 @@ spec:
             - name: BUILD_REGISTRY_URL
               value: {{ .Values.environment.BUILD_REGISTRY_URL }}
             - name: BUILD_REGISTRY_SECRET_NAME
-              value: {{ .Values.buildRegistry.secretName }}
+              value: {{ .Values.environment.BUILD_REGISTRY_SECRET_NAME }}
           ports:
             - name: http
               containerPort: {{ .Values.service.containerPort }}

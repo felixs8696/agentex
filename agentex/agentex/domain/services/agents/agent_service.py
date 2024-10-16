@@ -1,17 +1,17 @@
 from typing import Annotated, Optional, List, Tuple
 
 from fastapi import Depends
+from kubernetes_asyncio import client as k8s_client
 
 from agentex.adapters.containers.build_adapter_kaniko import DKanikoBuildGateway
 from agentex.adapters.kubernetes.adapter_kubernetes import DKubernetesGateway
 from agentex.config.dependencies import DEnvironmentVariables
 from agentex.domain.entities.actions import Action
 from agentex.domain.entities.agent_spec import AgentSpec
-from agentex.domain.entities.agents import Agent, AgentStatus
+from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.deployment import Deployment
 from agentex.domain.entities.job import Job
 from agentex.domain.entities.service import Service
-from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agents.action_repository import DActionRepository
 from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.utils.logging import make_logger
@@ -34,6 +34,7 @@ class AgentService:
         self.action_repo = action_repository
         self.agent_repo = agent_repository
         self.registry_url = environment_variables.BUILD_REGISTRY_URL
+        self.build_registry_secret_name = environment_variables.BUILD_REGISTRY_SECRET_NAME
 
     async def create_agent_with_actions(self, agent: Agent, actions: List[Action]) -> Tuple[Agent, List[Action]]:
         agent = await self.agent_repo.create(item=agent)
@@ -55,10 +56,31 @@ class AgentService:
     ) -> Deployment:
         return await self.k8s.create_deployment(
             namespace=self.default_namespace,
-            name=name,
-            image=image,
-            container_port=action_service_port,
-            replicas=replicas,
+            deployment=k8s_client.V1Deployment(
+                api_version="apps/v1",
+                kind="Deployment",
+                metadata=k8s_client.V1ObjectMeta(name=name),
+                spec=k8s_client.V1DeploymentSpec(
+                    replicas=replicas,
+                    selector={'matchLabels': {'app': name}},
+                    template=k8s_client.V1PodTemplateSpec(
+                        metadata=k8s_client.V1ObjectMeta(labels={'app': name}),
+                        spec=k8s_client.V1PodSpec(
+                            containers=[
+                                k8s_client.V1Container(
+                                    name=name,
+                                    image=image,
+                                    image_pull_policy="IfNotPresent",
+                                    ports=[k8s_client.V1ContainerPort(container_port=action_service_port)],
+                                ),
+                            ],
+                            image_pull_secrets=[
+                                k8s_client.V1LocalObjectReference(name=self.build_registry_secret_name)
+                            ],
+                        )
+                    )
+                )
+            ),
         )
 
     async def create_hosted_actions_service(
@@ -68,8 +90,21 @@ class AgentService:
     ) -> Service:
         return await self.k8s.create_service(
             namespace=self.default_namespace,
-            name=name,
-            container_port=action_service_port,
+            service=k8s_client.V1Service(
+                api_version="v1",
+                kind="Service",
+                metadata=k8s_client.V1ObjectMeta(name=name),
+                spec=k8s_client.V1ServiceSpec(
+                    selector={'app': name},
+                    ports=[
+                        k8s_client.V1ServicePort(
+                            port=80,
+                            target_port=action_service_port,
+                            protocol="TCP"
+                        )
+                    ]
+                )
+            ),
         )
 
     async def get_hosted_actions_deployment(self, name: str) -> Optional[Deployment]:

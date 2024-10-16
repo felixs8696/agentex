@@ -93,6 +93,12 @@ class KanikoBuildGateway(ContainerBuildGateway):
                                 name="build-registry-secret",
                                 secret=client.V1SecretVolumeSource(
                                     secret_name=self.build_registry_secret_name,
+                                    items=[
+                                        client.V1KeyToPath(
+                                            key=".dockerconfigjson",
+                                            path="config.json"
+                                        )
+                                    ]
                                 ),
                             ),
                         ],

@@ -113,7 +113,7 @@ volumes:
   - name: build-registry-secret
     secret:
       defaultMode: 420
-      secretName: build-registry-creds
+      secretName: hosted-actions-regcred
 #  - name: project-directory
 #    hostPath:
 #      path: /mnt/host/agentex  # Change this to your actual current directory path
@@ -150,7 +150,8 @@ environment:
   REDIS_URL: "redis://redis-master:6379"
   BUILD_CONTEXTS_PATH: "/mnt/build-contexts"
   BUILD_CONTEXT_PVC_NAME: "build-context-pvc"
-  BUILD_REGISTRY_URL: "harbor.harbor.svc.cluster.local:80/agentex-test"
+  BUILD_REGISTRY_URL: "felixsu8696"
+  BUILD_REGISTRY_SECRET_NAME: "hosted-actions-regcred"
 
 # PostgreSQL configuration
 postgres:
@@ -194,6 +195,3 @@ buildContexts:
     resources:
       requests:
         storage: 10Gi  # Adjust based on your needs
-
-buildRegistry:
-  secretName: build-registry-creds
