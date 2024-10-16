@@ -24,6 +24,7 @@ class EnvVarKeys(str, Enum):
     BUILD_CONTEXTS_PATH = "BUILD_CONTEXTS_PATH"
     BUILD_CONTEXT_PVC_NAME = "BUILD_CONTEXT_PVC_NAME"
     BUILD_REGISTRY_SECRET_NAME = "BUILD_REGISTRY_SECRET_NAME"
+    AGENTS_NAMESPACE = "AGENTS_NAMESPACE"
 
 
 class Environment(str, Enum):
@@ -46,6 +47,7 @@ class EnvironmentVariables(BaseModel):
     BUILD_CONTEXTS_PATH: Optional[str] = None
     BUILD_CONTEXT_PVC_NAME: Optional[str] = None
     BUILD_REGISTRY_SECRET_NAME: Optional[str] = None
+    AGENTS_NAMESPACE: Optional[str] = None
 
     @classmethod
     def refresh(cls) -> Optional[EnvironmentVariables]:
@@ -65,6 +67,7 @@ class EnvironmentVariables(BaseModel):
             BUILD_CONTEXTS_PATH=os.environ.get(EnvVarKeys.BUILD_CONTEXTS_PATH),
             BUILD_CONTEXT_PVC_NAME=os.environ.get(EnvVarKeys.BUILD_CONTEXT_PVC_NAME),
             BUILD_REGISTRY_SECRET_NAME=os.environ.get(EnvVarKeys.BUILD_REGISTRY_SECRET_NAME),
+            AGENTS_NAMESPACE=os.environ.get(EnvVarKeys.AGENTS_NAMESPACE),
         )
         refreshed_environment_variables = environment_variables
         return refreshed_environment_variables

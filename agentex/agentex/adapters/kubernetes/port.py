@@ -50,7 +50,8 @@ class KubernetesPort(ABC):
     async def call_service(
         self,
         namespace: str,
-        name: str, 
+        name: str,
+        port: Optional[int] = None,
         path: str = "",
         method: str = "GET",
         payload: Optional[Dict] = None

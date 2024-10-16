@@ -158,13 +158,23 @@ class KubernetesGateway(KubernetesPort):
         self,
         namespace: str,
         name: str,
+        port: Optional[int] = None,
         path: str = "",
         method: str = "GET",
         payload: Optional[Dict] = None
     ) -> Dict:
+        if path.startswith("/"):
+            path = path[1:]
+
+        if port:
+            url = f"http://{name}.{namespace}.svc.cluster.local:{port}/{path}"
+        else:
+            url = f"http://{name}.{namespace}.svc.cluster.local/{path}"
+
+        logger.info(f"Calling service: {url}")
         return await self.http_gateway.async_call(
-            method="GET",
-            url=f"http://{name}.{namespace}.svc.cluster.local/{path}",
+            method=method,
+            url=url,
             payload=payload
         )
 

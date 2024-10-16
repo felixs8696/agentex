@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from pydantic import Field
 
@@ -18,7 +18,7 @@ class AgentSpec(BaseModel):
         ...,
         description="The instructions for the agent."
     )
-    actions: Optional[Dict[str, ActionSpec]] = Field(
+    actions: Optional[List[ActionSpec]] = Field(
         default=None,
         description="The actions that the agent can perform."
     )

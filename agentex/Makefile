@@ -29,13 +29,10 @@ deploy: build-images
 	eval $(minikube -p minikube docker-env -u)
 
 port-forward:
-	@echo "Starting port-forward for Harbor services..."
-	(kubectl port-forward svc/harbor 8080:80 --namespace harbor &)
-	@echo "Harbor service port-forward running in the background."
-	(kubectl port-forward service/agentex 5003:80 &)
-	@echo "Agentex service port-forward running in the background."
-	(kubectl port-forward svc/temporal-web 3000:8080)
+	(kubectl port-forward svc/temporal-web --namespace temporal 3000:8080 &)
 	@echo "Temporal Web service port-forward running in the background."
+	(kubectl port-forward service/agentex 5003:80)
+	@echo "Agentex service port-forward running in the background."
 
 # Command to run everything in development mode using Minikube
 dev: build-images deploy port-forward

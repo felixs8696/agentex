@@ -17,14 +17,8 @@ class CreateHostedActionsDeploymentParams(BaseModel):
     replicas: int = 1
 
 
-class CreateHostedActionsServiceParams(BaseModel):
-    name: str
-    action_service_port: int
-
-
 class CallHostedActionsServiceParams(BaseModel):
     name: str
-    port: int
     path: str
     method: str = "GET"
     payload: Optional[dict] = None

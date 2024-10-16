@@ -26,15 +26,7 @@ make install
 minikube start
 ```
 
-### Install Helm charts and run the server
-
-#### In terminal
-```commandline
-make dev
-make port-forward # If the port forwarding is attempted before the pod is ready
-```
-
-#### Create secret to push and pull from private dockerhub registry
+### Create secret to push and pull from private dockerhub registry
 ```commandline
 kubectl create secret docker-registry hosted-actions-regcred \
   --docker-server=https://index.docker.io/v1/ \
@@ -43,30 +35,11 @@ kubectl create secret docker-registry hosted-actions-regcred \
   --docker-email=<email>
 ```
 
-### Helm Charts
-
+### Install Helm charts and run the server
 ```commandline
-helm upgrade --install redis bitnami/redis
-helm upgrade --install \
-    --repo https://go.temporal.io/helm-charts \
-    --set server.replicaCount=1 \
-    --set cassandra.config.cluster_size=1 \
-    --set elasticsearch.replicas=1 \
-    --set prometheus.enabled=false \
-    --set grafana.enabled=false \
-    temporal temporal \
-    --timeout 15m
-helm upgrade --install harbor harbor/harbor --namespace harbor -f charts/harbor/values.yaml
+make dev
+make port-forward # If the port forwarding is attempted before the pod is ready
 ```
-
-### Harbor Registry
-
-```commandline
-kubectl port-forward svc/harbor 8443:443 --namespace harbor
-```
-* Visit: https://127.0.0.1:8443
-* Enter username and password.
-
 
 ### Temporal
 
@@ -74,7 +47,7 @@ One time setup (See: https://github.com/temporalio/helm-charts?tab=readme-ov-fil
 ```commandline
 kubectl exec -it services/temporaltest-admintools /bin/bash
 tctl --ns default namespace desc  # if not found
-he
+tctl --ns default namespace re
 ```
 
 
@@ -135,7 +108,5 @@ WARNING: There are "resources" sections in the chart not set. Using "resourcesPr
 
 # TODO
 - [ ] Secure secrets with helm secrets
-- [ ] Restrict and rotate harbor secrets
-- [ ] Templatize hardcoded values (like Harbor registry)
-- [ ] Move Temporal to its own namespace
+- [ ] Templatize hardcoded values (like registry)
 - [ ] Separate deployments for each temporal worker pool

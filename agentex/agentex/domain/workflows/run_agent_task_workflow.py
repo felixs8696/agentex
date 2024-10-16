@@ -84,7 +84,7 @@ class AgentTaskActivities:
                         "parameters": action_spec.parameters,
                     }
                 }
-                for action_name, action_spec in agent_spec.actions.items()
+                for action_spec in agent_spec.actions
             ]
         )
         decision_response = await self.llm.acompletion(**completion_args.to_dict())

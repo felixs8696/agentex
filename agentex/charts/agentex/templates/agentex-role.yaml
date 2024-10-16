@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: agentex-agents
+  name: agentex-role
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "delete", "get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["create", "delete", "get", "watch", "list"]

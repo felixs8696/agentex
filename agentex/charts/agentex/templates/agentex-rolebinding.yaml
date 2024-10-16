@@ -1,13 +1,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: agentex-builds-role-binding
-  namespace: default
+  name: agentex-role-binding
+  namespace: agentex-agents
 subjects:
 - kind: ServiceAccount
   name: agentex-workers
   namespace: default
 roleRef:
   kind: Role
-  name: agentex-builds-role
+  name: agentex-role
   apiGroup: rbac.authorization.k8s.io

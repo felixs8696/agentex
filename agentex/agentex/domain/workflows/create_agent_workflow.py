@@ -42,7 +42,7 @@ class CreateAgentActivities:
     async def create_actions(
         self,
         params: CreateAgentActions,
-    ) -> Tuple[Agent, List[Action]]:
+    ) -> List[Action]:
         agent = params.agent
         actions = params.actions
 

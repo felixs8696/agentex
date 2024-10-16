@@ -53,6 +53,8 @@ spec:
               value: {{ .Values.environment.BUILD_REGISTRY_URL }}
             - name: BUILD_REGISTRY_SECRET_NAME
               value: {{ .Values.environment.BUILD_REGISTRY_SECRET_NAME }}
+            - name: AGENTS_NAMESPACE
+              value: {{ .Values.environment.AGENTS_NAMESPACE }}
           ports:
             - name: http
               containerPort: {{ .Values.service.containerPort }}

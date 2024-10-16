@@ -4,8 +4,6 @@ repositories:
 #    url: https://charts.bitnami.com/bitnami
   - name: temporal
     url: https://go.temporal.io/helm-charts
-  - name: harbor
-    url: https://helm.goharbor.io
 
 releases:
 #  - name: redis
@@ -13,6 +11,7 @@ releases:
 
   - name: temporal
     chart: temporal/temporal
+    namespace: temporal
     values:
       - server:
           replicaCount: 1
@@ -25,26 +24,6 @@ releases:
           enabled: false
         grafana:
           enabled: false
-#
-#  - name: harbor
-#    chart: harbor/harbor
-#    namespace: harbor
-#    values:
-#      - expose:
-#          type: clusterIP
-#          tls:
-#            enabled: false
-##            certSource: auto
-##            auto:
-##              commonName: harbor.harbor.svc.cluster.local
-##          clusterIP:
-##              name: harbor
-#        externalURL: "http://harbor.harbor.svc.cluster.local:80"
-#        persistence:
-#          enabled: true
-#          persistentVolumeClaim:
-#            registry:
-#              size: 10Gi
 
   - name: agentex-workers
     chart: ./agentex-workers

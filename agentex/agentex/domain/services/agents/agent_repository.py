@@ -32,16 +32,20 @@ class AgentRepository(PostgresCRUDRepository[AgentORM, Agent]):
         actions: Optional[List[Action]] = None,
     ) -> List[Agent]:
         # Fetch existing agents and actions from the database
-        if not agents:
-            agents = await self.batch_get(ids=agent_ids, names=agent_names)
-        if not actions:
-            actions = await self.action_repository.batch_get(ids=action_ids, names=action_names)
+        if agents:
+            agent_ids = [agent.id for agent in agents]
+
+        if actions:
+            action_ids = [action.id for action in actions]
 
         async with self.start_async_db_session(True) as session, async_sql_exception_handler():
             # Associate agents with actions
-            for agent in agents:
-                for action in actions:
-                    agent.actions.append(action)
+            agent_orms = await self._batch_get(session, agent_ids, agent_names)
+            action_orms = await self.action_repository._batch_get(session, action_ids, action_names)
+
+            for agent_orm in agent_orms:
+                for action_orm in action_orms:
+                    agent_orm.actions.append(action_orm)
 
             # Save changes to the session
             await session.commit()
