@@ -3,11 +3,11 @@ from typing import Annotated
 from fastapi import Depends
 
 from agentex.adapters.async_runtime.adapter_temporal import DTemporalGateway
-from agentex.domain.entities.agent_config import AgentConfig
+from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.tasks import Task
 from agentex.domain.entities.workflows import WorkflowState
-from agentex.domain.workflows.run_agent_task_workflow import AgentTaskWorkflow, AgentTaskWorkflowParams
 from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE
+from agentex.domain.workflows.run_agent_task_workflow import AgentTaskWorkflow, AgentTaskWorkflowParams
 
 
 class AgentTaskService:
@@ -22,7 +22,7 @@ class AgentTaskService:
         self.async_runtime = async_runtime
         self.task_queue = AGENT_TASK_TASK_QUEUE
 
-    async def submit_task(self, task: Task, agent_config: AgentConfig) -> str:
+    async def submit_task(self, task: Task, agent: Agent) -> str:
         """
         Submit a task to the async runtime for execution.
 
@@ -32,7 +32,7 @@ class AgentTaskService:
             AgentTaskWorkflow.run,
             AgentTaskWorkflowParams(
                 task=task,
-                agent_config=agent_config,
+                agent=agent,
             ),
             id=task.id,
             task_queue=self.task_queue,

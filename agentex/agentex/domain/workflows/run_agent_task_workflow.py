@@ -79,9 +79,9 @@ class AgentTaskActivities:
                 {
                     "type": "function",
                     "function": {
-                        "name": action.name,
-                        "description": action.description,
-                        "parameters": action.parameters,
+                        "name": action.schema.name,
+                        "description": action.schema.description,
+                        "parameters": action.schema.parameters,
                     }
                 }
                 for action in agent_spec.actions
@@ -135,7 +135,7 @@ class AgentTaskWorkflow:
     @workflow.run
     async def run(self, params: AgentTaskWorkflowParams):
         task = params.task
-        agent = params.agent_config
+        agent = params.agent
 
         # Give the agent the initial task
         success = await execute_workflow_activity(

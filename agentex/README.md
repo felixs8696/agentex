@@ -35,6 +35,13 @@ kubectl create secret docker-registry hosted-actions-regcred \
   --docker-email=<email>
 ```
 
+### Create secret to store your openai api key
+```commandline
+kubectl create secret generic openai-api-key \
+  --from-literal=api-key='your_openai_api_key' \
+  --namespace default
+```
+
 ### Install Helm charts and run the server
 ```commandline
 make dev

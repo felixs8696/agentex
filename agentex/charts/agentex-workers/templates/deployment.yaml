@@ -55,6 +55,11 @@ spec:
               value: {{ .Values.environment.BUILD_REGISTRY_SECRET_NAME }}
             - name: AGENTS_NAMESPACE
               value: {{ .Values.environment.AGENTS_NAMESPACE }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-api-key
+                  key: api-key
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

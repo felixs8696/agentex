@@ -4,8 +4,6 @@ from fastapi import Depends
 
 from agentex.adapters.llm.adapter_litellm import DLiteLLMGateway
 from agentex.api.schemas.tasks import GetTaskResponse
-from agentex.domain.entities.agent_config import AgentConfig, LLMConfig
-from agentex.domain.entities.messages import Message, UserMessage
 from agentex.domain.entities.tasks import Task
 from agentex.domain.services.agent_tasks.task_service import DAgentTaskService
 from agentex.domain.services.agents.agent_repository import DAgentRepository
@@ -34,9 +32,10 @@ class TasksUseCase:
         self.agent_state_repository = agent_state_repository
         self.model = "gpt-4o-mini"
 
-    async def create(self, agent_name: str, prompt: str) -> Task:
-        agent = await self.agent_repository.get(
+    async def create(self, agent_name: str, agent_version: str, prompt: str) -> Task:
+        agent = await self.agent_repository.get_by_name_and_version(
             name=agent_name,
+            version=agent_version,
         )
         task = await self.task_repository.create(
             Task(
@@ -45,37 +44,9 @@ class TasksUseCase:
                 prompt=prompt,
             )
         )
-        logger.info(f"AGENT: {agent}")
-        dummy_agent_config = AgentConfig(
-            agent=agent,
-            llm_config=LLMConfig(
-                model=self.model,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "get_current_weather",
-                            "description": "Get the current weather in a given location",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "location": {
-                                        "type": "string",
-                                        "description": "The city and state, e.g. San Francisco, CA",
-                                    },
-                                    "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
-                                },
-                                "required": ["location"],
-                            },
-                        },
-                    }
-                ],
-                tool_choice="auto",
-            )
-        )
         task_id = await self.task_service.submit_task(
             task=task,
-            agent_config=dummy_agent_config,
+            agent=agent,
         )
         assert task_id == task.id, f"Task ID mismatch: {task_id} != {task.id}"
         return task

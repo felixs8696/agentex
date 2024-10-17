@@ -7,9 +7,13 @@ from agentex.utils.model_utils import BaseModel
 
 
 class CreateTaskRequest(BaseModel):
-    agent: str = Field(
+    agent_name: str = Field(
         ...,
         title="The unique name of the agent to use to run the task",
+    )
+    agent_version: str = Field(
+        ...,
+        title="The version of the agent to use to run the task.",
     )
     prompt: str = Field(
         ...,

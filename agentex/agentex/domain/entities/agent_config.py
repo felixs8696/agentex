@@ -27,8 +27,3 @@ class LLMConfig(BaseModel):
     parallel_tool_calls: Optional[bool] = None
     logprobs: Optional[bool] = None
     top_logprobs: Optional[int] = None
-
-
-class AgentConfig(BaseModel):
-    agent: Agent
-    llm_config: LLMConfig

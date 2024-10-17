@@ -394,12 +394,13 @@ async def validate_hosted_actions_server_with_test_payloads(
 
     # Send test payloads to the hosted actions server
     for action in actions:
+        action_schema = action.schema
         test_activity = asyncio.create_task(
             execute_workflow_activity(
                 activity_name="call_hosted_actions_service",
                 arg=CallHostedActionsServiceParams(
                     name=service_name,
-                    path=f"/{action.name}",
+                    path=f"/{action_schema.name}",
                     method="POST",
                     payload=action.test_payload,
                 ),

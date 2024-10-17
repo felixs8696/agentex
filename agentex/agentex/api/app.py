@@ -156,7 +156,8 @@ async def create_task(
     task_use_case: DTaskUseCase,
 ) -> CreateTaskResponse:
     task = await task_use_case.create(
-        agent_name=request.agent,
+        agent_name=request.agent_name,
+        agent_version=request.agent_version,
         prompt=request.prompt
     )
     return CreateTaskResponse.from_orm(task)
