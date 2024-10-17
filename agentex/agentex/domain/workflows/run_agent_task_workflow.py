@@ -10,7 +10,7 @@ from agentex.adapters.llm.port import DLLMGateway
 from agentex.domain.entities.agent_config import LLMConfig
 from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.hosted_actions_service import HostedActionsService
-from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage
+from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage, SystemMessage
 from agentex.domain.entities.tasks import Task
 from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.services.agents.agent_state_service import DAgentStateService
@@ -57,9 +57,11 @@ class AgentTaskActivities:
     @activity.defn(name="init_task_state")
     async def init_task_state(self, params: InitTaskStateParams) -> bool:
         task = params.task
+        agent = params.agent
         await self.agent_state.messages.batch_append(
             task_id=task.id,
             messages=[
+                SystemMessage(content=agent.instructions),
                 UserMessage(content=task.prompt)
             ]
         )
@@ -104,7 +106,6 @@ class AgentTaskActivities:
 
         tool_response = await self.agent_service.call_hosted_actions_service(
             name=hosted_actions_service.service_name,
-            port=hosted_actions_service.service_port,
             path=f"/{tool_name}",
             method="POST",
             payload=tool_args
@@ -173,10 +174,7 @@ class AgentTaskWorkflow:
             finish_reason = decision_response.finish_reason
             decision = decision_response.message
             tool_calls = decision.tool_calls
-
-            if decision.content:
-                content = decision.content
-                break
+            content = decision.content
 
             # Execute tool activities if requested
             take_action_activities = []
