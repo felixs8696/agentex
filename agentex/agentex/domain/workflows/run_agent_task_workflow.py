@@ -173,7 +173,7 @@ class AgentTaskWorkflow:
         self.waiting_for_instruction = False
 
     @workflow.signal
-    async def approve(self) -> None:
+    async def approve(self, _: Optional[Any] = None) -> None:
         self.task_approved = True
 
     @workflow.run
@@ -201,8 +201,11 @@ class AgentTaskWorkflow:
 
         # Run the tool loop
         while True:
-            await self.run_tool_loop(task=task, agent=agent, hosted_actions_service=hosted_actions_service)
+            workflow.logger.info("Running tool loop")
+            content = await self.run_tool_loop(task=task, agent=agent, hosted_actions_service=hosted_actions_service)
+            workflow.logger.info("Tool loop finished")
             if params.require_approval:
+                workflow.logger.info("Waiting for instruction or approval")
                 self.waiting_for_instruction = True
                 workflow.logger.info("Waiting for instruction or approval")
                 await workflow.wait_condition(lambda: not self.waiting_for_instruction or self.task_approved)
@@ -230,7 +233,7 @@ class AgentTaskWorkflow:
 
         return {"status": "completed", "content": content}
 
-    async def run_tool_loop(self, task: Task, agent: Agent, hosted_actions_service: HostedActionsService) -> None:
+    async def run_tool_loop(self, task: Task, agent: Agent, hosted_actions_service: HostedActionsService) -> str:
         content = None
         finish_reason = None
         while finish_reason not in ("stop", "length", "content_filter"):
@@ -273,3 +276,5 @@ class AgentTaskWorkflow:
 
             # Wait for all tool activities to complete
             await asyncio.gather(*take_action_activities)
+
+        return content

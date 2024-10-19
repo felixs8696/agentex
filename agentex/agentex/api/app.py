@@ -186,7 +186,7 @@ async def modify_task(
     task_id: str,
     task_use_case: DTaskUseCase,
 ) -> None:
-    return await task_use_case.instruct(
+    return await task_use_case.modify(
         task_id=task_id,
         modification_request=request,
     )

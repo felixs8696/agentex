@@ -28,6 +28,13 @@ deploy: build-images
 	helmfile -f charts/helmfile.dev.yaml apply
 	eval $(minikube -p minikube docker-env -u)
 
+restart: build-images
+	kubectl rollout restart deployment agentex
+	kubectl rollout restart deployment agentex-workers
+	# Wait for both deployments to successfully restart
+	kubectl rollout status deployment/agentex
+	kubectl rollout status deployment/agentex-workers
+
 port-forward:
 	(kubectl port-forward svc/temporal-web --namespace temporal 3000:8080 &)
 	@echo "Temporal Web service port-forward running in the background."
@@ -35,7 +42,7 @@ port-forward:
 	@echo "Agentex service port-forward running in the background."
 
 # Command to run everything in development mode using Minikube
-dev: build-images deploy port-forward
+dev: build-images deploy restart port-forward
 
 # Command to stop and remove all services
 uninstall:
