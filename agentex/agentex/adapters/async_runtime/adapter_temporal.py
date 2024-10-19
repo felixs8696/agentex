@@ -1,6 +1,6 @@
 from datetime import timedelta
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Callable, Union
 
 from fastapi import Depends
 from temporalio.client import WorkflowExecutionStatus
@@ -10,6 +10,7 @@ from agentex.adapters.async_runtime.port import AsyncRuntime
 from agentex.config.dependencies import DTemporalClient
 from agentex.domain.entities.workflows import WorkflowState, RetryPolicy
 from agentex.utils.logging import make_logger
+from agentex.utils.model_utils import BaseModel
 
 logger = make_logger(__name__)
 
@@ -90,6 +91,15 @@ class TemporalGateway(AsyncRuntime):
             **kwargs,
         )
         return workflow_handle.id
+
+    async def send_signal(
+        self,
+        workflow_id: str,
+        signal: Union[str, Callable],
+        payload: Union[dict, list, str, int, float, bool, BaseModel]
+    ) -> None:
+        handle = self.client.get_workflow_handle(workflow_id=workflow_id)
+        await handle.signal(signal, payload)
 
     async def get_workflow_status(self, workflow_id: str) -> WorkflowState:
         handle = self.client.get_workflow_handle(workflow_id=workflow_id)

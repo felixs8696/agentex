@@ -12,7 +12,7 @@ from starlette.responses import Response
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
 
 from agentex.api.schemas.agents import CreateAgentResponse, CreateAgentRequest
-from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest, GetTaskResponse
+from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest, GetTaskResponse, ModifyTaskRequest
 from agentex.config import dependencies
 from agentex.domain.exceptions import GenericException
 from agentex.domain.use_cases.agents_use_case import DAgentsUseCase
@@ -158,7 +158,8 @@ async def create_task(
     task = await task_use_case.create(
         agent_name=request.agent_name,
         agent_version=request.agent_version,
-        prompt=request.prompt
+        prompt=request.prompt,
+        require_approval=request.require_approval,
     )
     return CreateTaskResponse.from_orm(task)
 
@@ -174,3 +175,18 @@ async def get_task(
 ) -> GetTaskResponse:
     get_task_response = await task_use_case.get(task_id)
     return get_task_response
+
+
+@app.post(
+    "/tasks/{task_id}/modify",
+    tags=[RouteTag.TASKS],
+)
+async def modify_task(
+    request: ModifyTaskRequest,
+    task_id: str,
+    task_use_case: DTaskUseCase,
+) -> None:
+    return await task_use_case.instruct(
+        task_id=task_id,
+        modification_request=request,
+    )

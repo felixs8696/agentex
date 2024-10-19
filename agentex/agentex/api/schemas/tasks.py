@@ -1,6 +1,10 @@
+from typing import Union, Annotated, Optional
+
 from pydantic import Field
 
 from agentex.domain.entities.agent_state import AgentState
+from agentex.domain.entities.instructions import CancelTaskRequest, ApproveTaskRequest, \
+    InstructTaskRequest
 from agentex.domain.entities.tasks import Task
 from agentex.domain.entities.workflows import WorkflowState
 from agentex.utils.model_utils import BaseModel
@@ -19,6 +23,11 @@ class CreateTaskRequest(BaseModel):
         ...,
         title="The user's text prompt for the task",
     )
+    require_approval: Optional[bool] = Field(
+        False,
+        title="Whether the task requires human approval in order to complete. "
+              "If false, the task is left running until the human sends a finish",
+    )
 
 
 class CreateTaskResponse(Task):
@@ -30,3 +39,9 @@ class GetTaskResponse(Task, AgentState):
         ...,
         title="The current state of the task",
     )
+
+
+ModifyTaskRequest = Annotated[
+    Union[ApproveTaskRequest, CancelTaskRequest, InstructTaskRequest],
+    Field(discriminator="type")
+]

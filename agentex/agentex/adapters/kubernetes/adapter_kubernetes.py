@@ -213,10 +213,13 @@ class KubernetesGateway(KubernetesPort):
         if not deployment:
             return None
         deployment_status = deployment.status
-        if deployment_status.available_replicas > 0:
-            status = DeploymentStatus.READY
-        elif deployment_status.available_replicas == 0:
-            status = DeploymentStatus.UNAVAILABLE
+        if deployment_status:
+            if deployment_status.available_replicas > 0:
+                status = DeploymentStatus.READY
+            elif deployment_status.available_replicas == 0:
+                status = DeploymentStatus.UNAVAILABLE
+            else:
+                status = DeploymentStatus.UNKNOWN
         else:
             status = DeploymentStatus.UNKNOWN
 
@@ -251,8 +254,4 @@ class KubernetesGateway(KubernetesPort):
         )
 
 
-async def get_async_kubernetes_gateway() -> KubernetesGateway:
-    return KubernetesGateway()
-
-
-DKubernetesGateway = Annotated[KubernetesGateway, Depends(get_async_kubernetes_gateway)]
+DKubernetesGateway = Annotated[KubernetesGateway, Depends(KubernetesGateway)]

@@ -1,10 +1,12 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends
 
 from agentex.adapters.llm.adapter_litellm import DLiteLLMGateway
-from agentex.api.schemas.tasks import GetTaskResponse
+from agentex.api.schemas.tasks import GetTaskResponse, ModifyTaskRequest
+from agentex.domain.entities.instructions import TaskModificationType
 from agentex.domain.entities.tasks import Task
+from agentex.domain.exceptions import ClientError
 from agentex.domain.services.agent_tasks.task_service import DAgentTaskService
 from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.domain.services.agents.agent_state_repository import DAgentStateRepository
@@ -32,7 +34,8 @@ class TasksUseCase:
         self.agent_state_repository = agent_state_repository
         self.model = "gpt-4o-mini"
 
-    async def create(self, agent_name: str, agent_version: str, prompt: str) -> Task:
+    async def create(self, agent_name: str, agent_version: str, prompt: str,
+                     require_approval: Optional[bool] = False) -> Task:
         agent = await self.agent_repository.get_by_name_and_version(
             name=agent_name,
             version=agent_version,
@@ -47,6 +50,7 @@ class TasksUseCase:
         task_id = await self.task_service.submit_task(
             task=task,
             agent=agent,
+            require_approval=require_approval,
         )
         assert task_id == task.id, f"Task ID mismatch: {task_id} != {task.id}"
         return task
@@ -61,6 +65,19 @@ class TasksUseCase:
             **task.to_dict(),
             **agent_state.to_dict(),
         )
+
+    async def modify(self, task_id: str, modification_request: ModifyTaskRequest) -> None:
+        if modification_request.type == TaskModificationType.CANCEL:
+            return await self.task_service.terminate(task_id=task_id)
+        elif modification_request.type == TaskModificationType.APPROVE:
+            return await self.task_service.approve(task_id=task_id)
+        elif modification_request.type == TaskModificationType.INSTRUCT:
+            return await self.task_service.instruct(
+                task_id=task_id,
+                prompt=modification_request.prompt,
+            )
+        else:
+            raise ClientError(f"Invalid modification request: {modification_request}")
 
 
 DTaskUseCase = Annotated[TasksUseCase, Depends(TasksUseCase)]

@@ -1,7 +1,7 @@
 import asyncio
 import json
 from datetime import timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -10,7 +10,7 @@ from agentex.adapters.llm.port import DLLMGateway
 from agentex.domain.entities.agent_config import LLMConfig
 from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.hosted_actions_service import HostedActionsService
-from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage, SystemMessage
+from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage, SystemMessage, Message
 from agentex.domain.entities.tasks import Task
 from agentex.domain.services.agents.agent_service import DAgentService
 from agentex.domain.services.agents.agent_state_service import DAgentStateService
@@ -42,6 +42,11 @@ class TakeActionParams(BaseModel):
     tool_args: Dict[str, Any]
 
 
+class AddMessageParams(BaseModel):
+    task_id: str
+    messages: List[Message]
+
+
 class AgentTaskActivities:
 
     def __init__(
@@ -64,6 +69,17 @@ class AgentTaskActivities:
                 SystemMessage(content=agent.instructions),
                 UserMessage(content=task.prompt)
             ]
+        )
+        return True
+
+    @activity.defn(name="append_to_task_state")
+    async def append_to_task_state(self, params: AddMessageParams) -> bool:
+        task_id = params.task_id
+        messages = params.messages
+
+        await self.agent_state.messages.batch_append(
+            task_id=task_id,
+            messages=messages
         )
         return True
 
@@ -128,10 +144,37 @@ class AgentTaskActivities:
 class AgentTaskWorkflowParams(BaseModel):
     task: Task
     agent: Agent
+    require_approval: Optional[bool] = False
+
+
+class HumanInstruction(BaseModel):
+    task_id: str
+    prompt: str
 
 
 @workflow.defn
 class AgentTaskWorkflow:
+
+    def __init__(self):
+        self.waiting_for_instruction = False
+        self.task_approved = False
+
+    @workflow.signal
+    async def instruct(self, instruction: HumanInstruction) -> None:
+        await execute_workflow_activity(
+            activity_name="append_to_task_state",
+            arg=AddMessageParams(
+                task_id=instruction.task_id,
+                messages=[UserMessage(content=instruction.prompt)]
+            ),
+            start_to_close_timeout=timedelta(seconds=60),
+            retry_policy=RetryPolicy(maximum_attempts=5),
+        )
+        self.waiting_for_instruction = False
+
+    @workflow.signal
+    async def approve(self) -> None:
+        self.task_approved = True
 
     @workflow.run
     async def run(self, params: AgentTaskWorkflowParams):
@@ -156,6 +199,38 @@ class AgentTaskWorkflow:
         # Set the agent status to ACTIVE
         await mark_agent_as_active(agent=agent)
 
+        # Run the tool loop
+        while True:
+            await self.run_tool_loop(task=task, agent=agent, hosted_actions_service=hosted_actions_service)
+            if params.require_approval:
+                self.waiting_for_instruction = True
+                workflow.logger.info("Waiting for instruction or approval")
+                await workflow.wait_condition(lambda: not self.waiting_for_instruction or self.task_approved)
+                if self.task_approved:
+                    workflow.logger.info("Task approved")
+                    break
+                else:
+                    workflow.logger.info("Task not approved, but instruction received, so continuing")
+                    continue
+            else:
+                break
+
+        # Set the agent status to IDLE
+        await mark_agent_as_idle(agent=agent)
+
+        # When finished, delete the hosted action server. It will get recreated when the next task
+        # is submitted
+        # TODO: Don't outright delete this, schedule it for deletion, that way if the next task is requested
+        #   in short succession, this doesn't get cleaned up.
+        #   Also, allow for the server to be configured to be persistent if the user desired warm execution times.
+        await delete_hosted_actions_server(
+            service_name=hosted_actions_service.service_name,
+            deployment_name=hosted_actions_service.deployment_name,
+        )
+
+        return {"status": "completed", "content": content}
+
+    async def run_tool_loop(self, task: Task, agent: Agent, hosted_actions_service: HostedActionsService) -> None:
         content = None
         finish_reason = None
         while finish_reason not in ("stop", "length", "content_filter"):
@@ -198,18 +273,3 @@ class AgentTaskWorkflow:
 
             # Wait for all tool activities to complete
             await asyncio.gather(*take_action_activities)
-
-        # Set the agent status to IDLE
-        await mark_agent_as_idle(agent=agent)
-
-        # When finished, delete the hosted action server. It will get recreated when the next task
-        # is submitted
-        # TODO: Don't outright delete this, schedule it for deletion, that way if the next task is requested
-        #   in short succession, this doesn't get cleaned up.
-        #   Also, allow for the server to be configured to be persistent if the user desired warm execution times.
-        await delete_hosted_actions_server(
-            service_name=hosted_actions_service.service_name,
-            deployment_name=hosted_actions_service.deployment_name,
-        )
-
-        return {"status": "completed", "content": content}

@@ -114,6 +114,7 @@ async def run_agent_task_worker(
                 agent_activities.init_task_state,
                 agent_activities.decide_action,
                 agent_activities.take_action,
+                agent_activities.append_to_task_state,
                 hosted_actions_service_activities.create_hosted_actions_service,
                 hosted_actions_service_activities.create_hosted_actions_deployment,
                 hosted_actions_service_activities.get_hosted_actions_service,
