@@ -32,5 +32,20 @@ class AgentRepository(PostgresCRUDRepository[AgentORM, Agent]):
 
             return self.entity.from_orm(result)
 
+    async def get_latest_version_by_name(self, name: str):
+        async with self.start_async_db_session(True) as session, async_sql_exception_handler():
+            result = await session.scalar(
+                select(self.orm)
+                .filter(self.orm.name == name)
+                .order_by(self.orm.version.desc())
+                .limit(1)
+            )
+
+            if result is None:
+                error_message = f"Agent with name '{name}' does not exist."
+                raise ItemDoesNotExist(error_message)
+
+            return self.entity.from_orm(result)
+
 
 DAgentRepository = Annotated[AgentRepository, Depends(AgentRepository)]

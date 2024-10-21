@@ -97,7 +97,7 @@ class PostgresCRUDRepository(CRUDRepository[T], Generic[M, T]):
             return self.entity.from_orm(result)
 
     async def batch_get(self, ids: Optional[List[str]] = None, names: Optional[List[str]] = None) -> List[T]:
-        async with self.start_async_db_session(False) as session, async_sql_exception_handler():
+        async with self.start_async_db_session(True) as session, async_sql_exception_handler():
             results = await self._batch_get(session, ids, names)
             return [self.entity.from_orm(result) for result in results]
 
@@ -157,8 +157,9 @@ class PostgresCRUDRepository(CRUDRepository[T], Generic[M, T]):
             await session.commit()
 
     async def list(self) -> List[T]:
-        async with self.start_async_db_session(False) as session, async_sql_exception_handler():
-            results = await session.execute(select(self.orm)).scalars()
+        async with self.start_async_db_session(True) as session, async_sql_exception_handler():
+            result = await session.execute(select(self.orm).order_by(self.orm.created_at.asc()))
+            results = result.scalars()
             return [self.entity.from_orm(result) for result in results]
 
     async def _get(self, session: AsyncSession, id: Optional[str] = None, name: Optional[str] = None) -> M:

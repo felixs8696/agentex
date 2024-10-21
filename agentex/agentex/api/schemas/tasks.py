@@ -30,15 +30,8 @@ class CreateTaskRequest(BaseModel):
     )
 
 
-class CreateTaskResponse(Task):
+class TaskModel(Task, AgentState):
     pass
-
-
-class GetTaskResponse(Task, AgentState):
-    state: WorkflowState = Field(
-        ...,
-        title="The current state of the task",
-    )
 
 
 ModifyTaskRequest = Annotated[

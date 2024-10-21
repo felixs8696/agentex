@@ -1,7 +1,7 @@
 import sys
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from fastapi import FastAPI, UploadFile, File, Body
 from fastapi import Request
@@ -11,8 +11,8 @@ from fastapi.exceptions import RequestValidationError, HTTPException
 from starlette.responses import Response
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
 
-from agentex.api.schemas.agents import CreateAgentResponse, CreateAgentRequest
-from agentex.api.schemas.tasks import CreateTaskResponse, CreateTaskRequest, GetTaskResponse, ModifyTaskRequest
+from agentex.api.schemas.agents import CreateAgentRequest, AgentModel
+from agentex.api.schemas.tasks import CreateTaskRequest, TaskModel, ModifyTaskRequest
 from agentex.config import dependencies
 from agentex.domain.exceptions import GenericException
 from agentex.domain.use_cases.agents_use_case import DAgentsUseCase
@@ -127,14 +127,14 @@ async def echo(request: EchoMessage):
 
 @app.post(
     path="/agents",
-    response_model=CreateAgentResponse,
+    response_model=AgentModel,
     tags=[RouteTag.AGENTS],
 )
 async def create_agent(
     agents_use_case: DAgentsUseCase,
     agent_package: UploadFile = File(...),
     request: CreateAgentRequest = Body(...),
-) -> CreateAgentResponse:
+) -> AgentModel:
     logger.info(f"Creating agent: {request}")
     agent = await agents_use_case.create(
         agent_package=agent_package,
@@ -143,38 +143,101 @@ async def create_agent(
         description=request.description,
         version=request.version,
     )
-    return CreateAgentResponse.from_orm(agent)
+    return AgentModel.from_orm(agent)
+
+
+@app.get(
+    path="/agents/{agent_id}",
+    response_model=AgentModel,
+    tags=[RouteTag.AGENTS],
+)
+async def get_agent(
+    agent_id: str,
+    agents_use_case: DAgentsUseCase,
+):
+    agent = await agents_use_case.get(id=agent_id)
+    return AgentModel.from_orm(agent)
+
+
+@app.get(
+    path="/agents",
+    response_model=List[AgentModel],
+    tags=[RouteTag.AGENTS],
+)
+async def list_agents(
+    agents_use_case: DAgentsUseCase,
+):
+    agents = await agents_use_case.list()
+    return [AgentModel.from_orm(agent) for agent in agents]
+
+
+@app.delete(
+    path="/agents/{agent_name}",
+    response_model=AgentModel,
+    tags=[RouteTag.AGENTS],
+)
+async def delete_agent(
+    agent_name: str,
+    agents_use_case: DAgentsUseCase,
+):
+    agent = await agents_use_case.delete(name=agent_name)
+    return AgentModel.from_orm(agent)
 
 
 @app.post(
     "/tasks",
-    response_model=CreateTaskResponse,
+    response_model=TaskModel,
     tags=[RouteTag.TASKS],
 )
 async def create_task(
     request: CreateTaskRequest,
     task_use_case: DTaskUseCase,
-) -> CreateTaskResponse:
+) -> TaskModel:
     task = await task_use_case.create(
         agent_name=request.agent_name,
         agent_version=request.agent_version,
         prompt=request.prompt,
         require_approval=request.require_approval,
     )
-    return CreateTaskResponse.from_orm(task)
+    return TaskModel.from_orm(task)
 
 
 @app.get(
     "/tasks/{task_id}",
-    response_model=GetTaskResponse,
+    response_model=TaskModel,
     tags=[RouteTag.TASKS],
 )
 async def get_task(
     task_id: str,
     task_use_case: DTaskUseCase,
-) -> GetTaskResponse:
+) -> TaskModel:
     get_task_response = await task_use_case.get(task_id)
     return get_task_response
+
+
+@app.get(
+    path="/tasks",
+    response_model=List[TaskModel],
+    tags=[RouteTag.TASKS],
+)
+async def list_tasks(
+    task_use_case: DTaskUseCase,
+):
+    tasks = await task_use_case.list()
+    return [TaskModel.from_orm(task) for task in tasks]
+
+
+@app.delete(
+    "/tasks/{task_id}",
+    response_model=TaskModel,
+    tags=[RouteTag.TASKS],
+)
+async def delete_task(
+    task_id: str,
+    task_use_case: DTaskUseCase,
+) -> TaskModel:
+    task = await task_use_case.delete(id=task_id)
+    return TaskModel.from_orm(task)
 
 
 @app.post(

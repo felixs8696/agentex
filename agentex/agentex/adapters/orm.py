@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
+from agentex.adapters.async_runtime.adapter_temporal import TaskStatus
 from agentex.domain.entities.agents import PackagingMethod, AgentStatus
 from agentex.utils.ids import orm_id
 
@@ -42,5 +43,7 @@ class TaskORM(BaseORM):
     agent_id = Column(String, ForeignKey('agents.id'), nullable=False)
     prompt = Column(String, nullable=False)
     agent = relationship("AgentORM")
+    status = Column(SQLAlchemyEnum(TaskStatus), nullable=True)
+    status_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))

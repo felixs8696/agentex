@@ -5,6 +5,7 @@ from typing import Annotated, Callable, Union
 from fastapi import Depends
 from temporalio.client import WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy, RetryPolicy as TemporalRetryPolicy
+from temporalio.service import RPCError, RPCStatusCode
 
 from agentex.adapters.async_runtime.port import AsyncRuntime
 from agentex.config.dependencies import DTemporalClient
@@ -18,7 +19,6 @@ logger = make_logger(__name__)
 class TaskStatus(str, Enum):
     CANCELED = "CANCELED"
     COMPLETED = "COMPLETED"
-    CONTINUED_AS_NEW = "CONTINUED_AS_NEW"
     FAILED = "FAILED"
     RUNNING = "RUNNING"
     TERMINATED = "TERMINATED"
@@ -102,9 +102,18 @@ class TemporalGateway(AsyncRuntime):
         await handle.signal(signal, payload)
 
     async def get_workflow_status(self, workflow_id: str) -> WorkflowState:
-        handle = self.client.get_workflow_handle(workflow_id=workflow_id)
-        description = await handle.describe()
-        return TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON[description.status]
+        try:
+            handle = self.client.get_workflow_handle(workflow_id=workflow_id)
+            description = await handle.describe()
+            return TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON[description.status]
+        except RPCError as e:
+            if e.status == RPCStatusCode.NOT_FOUND:
+                return WorkflowState(
+                    status="NOT_FOUND",
+                    reason="Workflow not found",
+                    is_terminal=True,
+                )
+            raise
 
     async def terminate_workflow(self, workflow_id: str) -> None:
         return await self.client.get_workflow_handle(workflow_id).terminate()

@@ -1,9 +1,9 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List
 
 from fastapi import Depends
 
 from agentex.adapters.llm.adapter_litellm import DLiteLLMGateway
-from agentex.api.schemas.tasks import GetTaskResponse, ModifyTaskRequest
+from agentex.api.schemas.tasks import TaskModel, ModifyTaskRequest
 from agentex.domain.entities.instructions import TaskModificationType
 from agentex.domain.entities.tasks import Task
 from agentex.domain.exceptions import ClientError
@@ -55,13 +55,18 @@ class TasksUseCase:
         assert task_id == task.id, f"Task ID mismatch: {task_id} != {task.id}"
         return task
 
-    async def get(self, task_id: str) -> GetTaskResponse:
+    async def get(self, task_id: str) -> TaskModel:
         task = await self.task_repository.get(id=task_id)
         task_state = await self.task_service.get_state(task_id=task_id)
         agent_state = await self.agent_state_repository.load(task_id=task_id)
 
-        return GetTaskResponse(
-            state=task_state,
+        task.status = task_state.status
+        task.status_reason = task_state.reason
+
+        if task_state.is_terminal:
+            await self.update(task)
+
+        return TaskModel(
             **task.to_dict(),
             **agent_state.to_dict(),
         )
@@ -78,6 +83,15 @@ class TasksUseCase:
             )
         else:
             raise ClientError(f"Invalid modification request: {modification_request}")
+
+    async def update(self, task: Task) -> Task:
+        return await self.task_repository.update(item=task)
+
+    async def delete(self, id: Optional[str], name: Optional[str]) -> Task:
+        return await self.task_repository.delete(id=id, name=name)
+
+    async def list(self) -> List[Task]:
+        return await self.task_repository.list()
 
 
 DTaskUseCase = Annotated[TasksUseCase, Depends(TasksUseCase)]
