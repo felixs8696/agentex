@@ -73,7 +73,7 @@ class TasksUseCase:
 
     async def modify(self, task_id: str, modification_request: ModifyTaskRequest) -> None:
         if modification_request.type == TaskModificationType.CANCEL:
-            return await self.task_service.terminate(task_id=task_id)
+            return await self.task_service.cancel(task_id=task_id)
         elif modification_request.type == TaskModificationType.APPROVE:
             return await self.task_service.approve(task_id=task_id)
         elif modification_request.type == TaskModificationType.INSTRUCT:
