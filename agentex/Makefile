@@ -38,6 +38,8 @@ restart: build-images
 port-forward:
 	(kubectl port-forward svc/temporal-web --namespace temporal 3000:8080 &)
 	@echo "Temporal Web service port-forward running in the background."
+#	(kubectl port-forward svc/airbyte-airbyte-webapp-svc --namespace airbyte 5004:80 &)
+#	@echo "Airbyte Web service port-forward running in the background."
 	(kubectl port-forward service/agentex 5003:80)
 	@echo "Agentex service port-forward running in the background."
 

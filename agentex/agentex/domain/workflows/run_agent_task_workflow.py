@@ -180,58 +180,65 @@ class AgentTaskWorkflow:
     async def run(self, params: AgentTaskWorkflowParams):
         task = params.task
         agent = params.agent
+        hosted_actions_service = None
+        try:
+            # Give the agent the initial task
+            success = await execute_workflow_activity(
+                activity_name="init_task_state",
+                arg=InitTaskStateParams(
+                    task=task,
+                    agent=agent,
+                ),
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+            )
+            logger.info(f"Task state initialized: {success}")
 
-        # Give the agent the initial task
-        success = await execute_workflow_activity(
-            activity_name="init_task_state",
-            arg=InitTaskStateParams(
-                task=task,
-                agent=agent,
-            ),
-            start_to_close_timeout=timedelta(seconds=60),
-            retry_policy=RetryPolicy(maximum_attempts=5),
-        )
-        logger.info(f"Task state initialized: {success}")
+            # Start up the action server
+            hosted_actions_service = await start_hosted_actions_server(agent=agent)
 
-        # Start up the action server
-        hosted_actions_service = await start_hosted_actions_server(agent=agent)
+            # Set the agent status to ACTIVE
+            await mark_agent_as_active(agent=agent)
 
-        # Set the agent status to ACTIVE
-        await mark_agent_as_active(agent=agent)
-
-        # Run the tool loop
-        while True:
-            workflow.logger.info("Running tool loop")
-            content = await self.run_tool_loop(task=task, agent=agent, hosted_actions_service=hosted_actions_service)
-            workflow.logger.info("Tool loop finished")
-            if params.require_approval:
-                workflow.logger.info("Waiting for instruction or approval")
-                self.waiting_for_instruction = True
-                workflow.logger.info("Waiting for instruction or approval")
-                await workflow.wait_condition(lambda: not self.waiting_for_instruction or self.task_approved)
-                if self.task_approved:
-                    workflow.logger.info("Task approved")
-                    break
+            # Run the tool loop
+            while True:
+                logger.info("Running tool loop")
+                content = await self.run_tool_loop(task=task, agent=agent,
+                                                   hosted_actions_service=hosted_actions_service)
+                logger.info("Tool loop finished")
+                if params.require_approval:
+                    logger.info("Waiting for instruction or approval")
+                    self.waiting_for_instruction = True
+                    logger.info("Waiting for instruction or approval")
+                    await workflow.wait_condition(lambda: not self.waiting_for_instruction or self.task_approved)
+                    if self.task_approved:
+                        logger.info("Task approved")
+                        break
+                    else:
+                        logger.info("Task not approved, but instruction received, so continuing")
+                        continue
                 else:
-                    workflow.logger.info("Task not approved, but instruction received, so continuing")
-                    continue
-            else:
-                break
+                    break
+            status = "completed"
+        except asyncio.CancelledError as error:
+            logger.warning(f"Task canceled by user: {task.id}")
+            raise error
+        finally:
+            # Set the agent status to IDLE
+            await mark_agent_as_idle(agent=agent)
 
-        # Set the agent status to IDLE
-        await mark_agent_as_idle(agent=agent)
+            # When finished, delete the hosted action server. It will get recreated when the next task
+            # is submitted
+            # TODO: Don't outright delete this, schedule it for deletion, that way if the next task is requested
+            #   in short succession, this doesn't get cleaned up.
+            #   Also, allow for the server to be configured to be persistent if the user desired warm execution times.
+            if hosted_actions_service:
+                await delete_hosted_actions_server(
+                    service_name=hosted_actions_service.service_name,
+                    deployment_name=hosted_actions_service.deployment_name,
+                )
 
-        # When finished, delete the hosted action server. It will get recreated when the next task
-        # is submitted
-        # TODO: Don't outright delete this, schedule it for deletion, that way if the next task is requested
-        #   in short succession, this doesn't get cleaned up.
-        #   Also, allow for the server to be configured to be persistent if the user desired warm execution times.
-        await delete_hosted_actions_server(
-            service_name=hosted_actions_service.service_name,
-            deployment_name=hosted_actions_service.deployment_name,
-        )
-
-        return {"status": "completed", "content": content}
+        return {"status": status, "content": content}
 
     async def run_tool_loop(self, task: Task, agent: Agent, hosted_actions_service: HostedActionsService) -> str:
         content = None

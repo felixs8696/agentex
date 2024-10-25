@@ -23,7 +23,7 @@ make install
 
 ### Start minikube
 ```commandline
-minikube start
+minikube start --cpus 4 --memory 16384
 ```
 
 ### Create secret to push and pull from private dockerhub registry

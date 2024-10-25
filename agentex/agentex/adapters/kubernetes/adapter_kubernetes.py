@@ -213,7 +213,7 @@ class KubernetesGateway(KubernetesPort):
         if not deployment:
             return None
         deployment_status = deployment.status
-        if deployment_status:
+        if deployment_status and deployment_status.available_replicas:
             if deployment_status.available_replicas > 0:
                 status = DeploymentStatus.READY
             elif deployment_status.available_replicas == 0:

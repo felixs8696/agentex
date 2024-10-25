@@ -66,6 +66,11 @@ class AgentTaskService:
         )
 
     async def cancel(self, task_id: str) -> None:
+        return await self.async_runtime.cancel_workflow(
+            workflow_id=task_id,
+        )
+
+    async def terminate(self, task_id: str) -> None:
         return await self.async_runtime.terminate_workflow(
             workflow_id=task_id,
         )

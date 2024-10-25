@@ -118,5 +118,8 @@ class TemporalGateway(AsyncRuntime):
     async def terminate_workflow(self, workflow_id: str) -> None:
         return await self.client.get_workflow_handle(workflow_id).terminate()
 
+    async def cancel_workflow(self, workflow_id: str) -> None:
+        return await self.client.get_workflow_handle(workflow_id).cancel()
+
 
 DTemporalGateway = Annotated[TemporalGateway, Depends(TemporalGateway)]
