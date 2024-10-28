@@ -8,6 +8,7 @@ from temporalio.common import RetryPolicy
 
 from agentex.adapters.llm.port import DLLMGateway
 from agentex.domain.entities.agent_config import LLMConfig
+from agentex.domain.entities.agent_response import AgentResponse
 from agentex.domain.entities.agents import Agent
 from agentex.domain.entities.hosted_actions_service import HostedActionsService
 from agentex.domain.entities.messages import UserMessage, LLMChoice, ToolMessage, SystemMessage, Message
@@ -120,24 +121,53 @@ class AgentTaskActivities:
         tool_name = params.tool_name
         tool_args = params.tool_args
 
+        agent_state = await self.agent_state.get(task.id)
         tool_response = await self.agent_service.call_hosted_actions_service(
             name=hosted_actions_service.service_name,
             path=f"/{tool_name}",
             method="POST",
-            payload=tool_args
+            payload={
+                **tool_args,
+                "state": agent_state.to_dict(),
+            }
         )
-        try:
-            tool_call_message = ToolMessage(
-                content=json.dumps(tool_response),
-                tool_call_id=tool_call_id,
-                name=tool_name,
+        agent_response = AgentResponse.from_dict(tool_response)
+
+        artifacts_created, artifacts_updated = [], []
+        if agent_response.artifacts:
+            existing_artifacts = await self.agent_state.context.get_value(task.id, "artifacts") or {}
+            for artifact in agent_response.artifacts:
+                artifact_name_and_desc = dict(name=artifact.name, description=artifact.description)
+                if artifact.name in existing_artifacts:
+                    artifacts_updated.append(artifact_name_and_desc)
+                else:
+                    artifacts_created.append(artifact_name_and_desc)
+                existing_artifacts[artifact.name] = dict(
+                    description=artifact.description,
+                    content=artifact.content
+                )
+            await self.agent_state.context.set_value(
+                task_id=task.id,
+                key="artifacts",
+                value=existing_artifacts
             )
-        except Exception as e:
-            raise Exception(f"Error creating tool call message: {e}, Params: {params}")
+
+        artifacts_created_and_updated_message = ""
+        if artifacts_created:
+            artifacts_created_and_updated_message += f"\n\n Artifacts created: {artifacts_created}"
+        if artifacts_updated:
+            artifacts_created_and_updated_message += f"\n\n Artifacts updated: {artifacts_updated}"
+
+        tool_call_message = ToolMessage(
+            content=str(agent_response.message) + artifacts_created_and_updated_message,
+            tool_call_id=tool_call_id,
+            name=tool_name,
+        )
         await self.agent_state.messages.append(
             task_id=task.id,
             message=tool_call_message
         )
+
         return tool_response
 
 
