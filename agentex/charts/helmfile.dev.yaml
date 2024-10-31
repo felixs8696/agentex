@@ -4,8 +4,6 @@ repositories:
     url: https://charts.bitnami.com/bitnami
   - name: temporal
     url: https://go.temporal.io/helm-charts
-  - name: airbyte
-    url: https://airbytehq.github.io/helm-charts
 
 releases:
   - name: redis
@@ -29,13 +27,6 @@ releases:
           enabled: false
         grafana:
           enabled: false
-
-  - name: airbyte
-    chart: airbyte/airbyte
-    namespace: airbyte
-    values:
-      - app:
-          replicas: 1
 
   - name: agentex-workers
     chart: ./agentex-workers
