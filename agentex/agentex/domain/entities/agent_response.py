@@ -31,7 +31,7 @@ class AgentResponse(BaseModel):
                     "a larger payload that the agent doesn't need persistent access to, use the context field."
     )
     artifacts: Optional[List[Artifact]] = Field(
-        ...,
+        None,
         description="If a larger payload is needed to be stored in the agent's context, use this field. This will not "
                     "be persistently stored in the agent's context, but the agent knows how to retrieve this "
                     "information when it needs it. It will be exposed to the user on the UI as an artifact."

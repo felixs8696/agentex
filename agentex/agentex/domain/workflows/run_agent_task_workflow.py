@@ -1,7 +1,7 @@
 import asyncio
 import json
 from datetime import timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -114,7 +114,7 @@ class AgentTaskActivities:
         return decision_response
 
     @activity.defn(name="take_action")
-    async def take_action(self, params: TakeActionParams) -> Optional[Dict]:
+    async def take_action(self, params: TakeActionParams) -> Optional[AgentResponse]:
         task = params.task
         hosted_actions_service = params.hosted_actions_service
         tool_call_id = params.tool_call_id
@@ -122,16 +122,25 @@ class AgentTaskActivities:
         tool_args = params.tool_args
 
         agent_state = await self.agent_state.get(task.id)
-        tool_response = await self.agent_service.call_hosted_actions_service(
-            name=hosted_actions_service.service_name,
-            path=f"/{tool_name}",
-            method="POST",
-            payload={
-                **tool_args,
-                "state": agent_state.to_dict(),
-            }
-        )
-        agent_response = AgentResponse.from_dict(tool_response)
+
+        exception = None
+        try:
+            tool_response = await self.agent_service.call_hosted_actions_service(
+                name=hosted_actions_service.service_name,
+                path=f"/{tool_name}",
+                method="POST",
+                payload={
+                    **tool_args,
+                    "state": agent_state.to_dict(),
+                }
+            )
+            agent_response = AgentResponse.from_dict(tool_response)
+        except Exception as error:
+            # Log the error so the agent can fix it if possible (the activity retry loop should handle)
+            agent_response = AgentResponse(
+                message=str(error),
+            )
+            exception = error
 
         artifacts_created, artifacts_updated = [], []
         if agent_response.artifacts:
@@ -167,8 +176,13 @@ class AgentTaskActivities:
             task_id=task.id,
             message=tool_call_message
         )
+        logger.info(f"Tool call response: {agent_response}")
 
-        return tool_response
+        # Raise the exception, this will trigger a temporal retry
+        if exception:
+            raise exception
+
+        return agent_response
 
 
 class AgentTaskWorkflowParams(BaseModel):
@@ -294,6 +308,7 @@ class AgentTaskWorkflow:
             # Execute tool activities if requested
             take_action_activities = []
             if decision.tool_calls:
+                logger.info(f"Executing tool calls: {tool_calls}")
                 for tool_call in tool_calls:
                     take_action_activity = asyncio.create_task(
                         execute_workflow_activity(
