@@ -2,7 +2,6 @@ from typing import Annotated, Optional, List
 
 from fastapi import Depends
 
-from agentex.adapters.llm.adapter_litellm import DLiteLLMGateway
 from agentex.api.schemas.tasks import TaskModel, ModifyTaskRequest
 from agentex.domain.entities.instructions import TaskModificationType
 from agentex.domain.entities.tasks import Task
@@ -21,13 +20,11 @@ class TasksUseCase:
 
     def __init__(
         self,
-        llm_gateway: DLiteLLMGateway,
         task_service: DAgentTaskService,
         task_repository: DTaskRepository,
         agent_repository: DAgentRepository,
         agent_state_repository: DAgentStateRepository,
     ):
-        self.llm = llm_gateway
         self.task_service = task_service
         self.task_repository = task_repository
         self.agent_repository = agent_repository
