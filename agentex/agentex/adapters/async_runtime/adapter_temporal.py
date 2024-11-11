@@ -7,7 +7,7 @@ from temporalio.client import WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy, RetryPolicy as TemporalRetryPolicy
 from temporalio.service import RPCError, RPCStatusCode
 
-from agentex.adapters.async_runtime.port import AsyncRuntime
+from agentex.adapters.async_runtime.port import AsyncRuntime, DuplicateWorkflowPolicy
 from agentex.config.dependencies import DTemporalClient
 from agentex.domain.entities.workflows import WorkflowState, RetryPolicy
 from agentex.utils.logging import make_logger
@@ -65,6 +65,13 @@ TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON = {
     ),
 }
 
+DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
+    DuplicateWorkflowPolicy.ALLOW_DUPLICATE: WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    DuplicateWorkflowPolicy.ALLOW_DUPLICATE_FAILED_ONLY: WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY,
+    DuplicateWorkflowPolicy.REJECT_DUPLICATE: WorkflowIDReusePolicy.REJECT_DUPLICATE,
+    DuplicateWorkflowPolicy.TERMINATE_IF_RUNNING: WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+}
+
 
 class TemporalGateway(AsyncRuntime):
 
@@ -74,6 +81,7 @@ class TemporalGateway(AsyncRuntime):
     async def start_workflow(
         self,
         *args,
+        duplicate_policy: DuplicateWorkflowPolicy = DuplicateWorkflowPolicy.ALLOW_DUPLICATE,
         retry_policy=RetryPolicy(maximum_attempts=1),
         task_timeout=timedelta(seconds=10),
         execution_timeout=timedelta(seconds=86400),
@@ -86,7 +94,7 @@ class TemporalGateway(AsyncRuntime):
             retry_policy=temporal_retry_policy,
             task_timeout=task_timeout,
             execution_timeout=execution_timeout,
-            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+            id_reuse_policy=DUPLICATE_POLICY_TO_ID_REUSE_POLICY[duplicate_policy],
             *args,
             **kwargs,
         )

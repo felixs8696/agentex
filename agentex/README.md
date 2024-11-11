@@ -42,6 +42,13 @@ kubectl create secret generic openai-api-key \
   --namespace default
 ```
 
+### Create secret to store the openai api key and any other secrets for your agents
+```commandline 
+kubectl create secret generic openai-api-key \
+  --from-literal=api-key='your_openai_api_key' \
+  --namespace agentex-agents
+```
+
 ### Install Helm charts and run the server
 ```commandline
 make dev

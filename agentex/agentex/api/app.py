@@ -138,10 +138,10 @@ async def create_agent(
     logger.info(f"Creating agent: {request}")
     agent = await agents_use_case.create(
         agent_package=agent_package,
-        action_service_port=request.action_service_port,
         name=request.name,
         description=request.description,
-        version=request.version,
+        workflow_name=request.workflow_name,
+        workflow_queue_name=request.workflow_queue_name,
     )
     return AgentModel.from_orm(agent)
 
@@ -195,7 +195,6 @@ async def create_task(
 ) -> TaskModel:
     task = await task_use_case.create(
         agent_name=request.agent_name,
-        agent_version=request.agent_version,
         prompt=request.prompt,
         require_approval=request.require_approval,
     )

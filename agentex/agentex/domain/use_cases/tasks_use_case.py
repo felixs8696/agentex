@@ -34,11 +34,10 @@ class TasksUseCase:
         self.agent_state_repository = agent_state_repository
         self.model = "gpt-4o-mini"
 
-    async def create(self, agent_name: str, agent_version: str, prompt: str,
+    async def create(self, agent_name: str, prompt: str,
                      require_approval: Optional[bool] = False) -> Task:
-        agent = await self.agent_repository.get_by_name_and_version(
+        agent = await self.agent_repository.get(
             name=agent_name,
-            version=agent_version,
         )
         task = await self.task_repository.create(
             Task(

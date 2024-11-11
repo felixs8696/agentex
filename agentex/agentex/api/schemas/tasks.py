@@ -6,7 +6,6 @@ from agentex.domain.entities.agent_state import AgentState
 from agentex.domain.entities.instructions import CancelTaskRequest, ApproveTaskRequest, \
     InstructTaskRequest
 from agentex.domain.entities.tasks import Task
-from agentex.domain.entities.workflows import WorkflowState
 from agentex.utils.model_utils import BaseModel
 
 
@@ -14,10 +13,6 @@ class CreateTaskRequest(BaseModel):
     agent_name: str = Field(
         ...,
         title="The unique name of the agent to use to run the task",
-    )
-    agent_version: str = Field(
-        ...,
-        title="The version of the agent to use to run the task.",
     )
     prompt: str = Field(
         ...,

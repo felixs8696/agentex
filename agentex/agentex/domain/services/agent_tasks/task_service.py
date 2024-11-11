@@ -4,11 +4,9 @@ from fastapi import Depends
 
 from agentex.adapters.async_runtime.adapter_temporal import DTemporalGateway
 from agentex.domain.entities.agents import Agent
-from agentex.domain.entities.tasks import Task
+from agentex.domain.entities.tasks import Task, AgentTaskWorkflowParams
 from agentex.domain.entities.workflows import WorkflowState
-from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE
-from agentex.domain.workflows.run_agent_task_workflow import AgentTaskWorkflow, AgentTaskWorkflowParams, \
-    HumanInstruction
+from agentex.domain.workflows.entities.messages import SignalName, HumanInstruction
 
 
 class AgentTaskService:
@@ -21,7 +19,6 @@ class AgentTaskService:
         async_runtime: DTemporalGateway,
     ):
         self.async_runtime = async_runtime
-        self.task_queue = AGENT_TASK_TASK_QUEUE
 
     async def submit_task(self, task: Task, agent: Agent, require_approval: Optional[bool] = False) -> str:
         """
@@ -30,14 +27,14 @@ class AgentTaskService:
         returns the workflow ID of the temporal workflow
         """
         return await self.async_runtime.start_workflow(
-            AgentTaskWorkflow.run,
-            AgentTaskWorkflowParams(
+            workflow=agent.workflow_name,
+            arg=AgentTaskWorkflowParams(
                 task=task,
                 agent=agent,
                 require_approval=require_approval,
             ),
             id=task.id,
-            task_queue=self.task_queue,
+            task_queue=agent.workflow_queue_name,
         )
 
     async def get_state(self, task_id: str) -> WorkflowState:
@@ -51,7 +48,7 @@ class AgentTaskService:
     async def instruct(self, task_id: str, prompt: str) -> None:
         return await self.async_runtime.send_signal(
             workflow_id=task_id,
-            signal=AgentTaskWorkflow.instruct,
+            signal=SignalName.INSTRUCT,
             payload=HumanInstruction(
                 task_id=task_id,
                 prompt=prompt,
@@ -61,7 +58,7 @@ class AgentTaskService:
     async def approve(self, task_id: str) -> None:
         return await self.async_runtime.send_signal(
             workflow_id=task_id,
-            signal=AgentTaskWorkflow.approve,
+            signal=SignalName.APPROVE,
             payload=None
         )
 

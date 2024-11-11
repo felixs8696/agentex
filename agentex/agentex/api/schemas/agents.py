@@ -1,8 +1,7 @@
-from typing import Optional, List
+from typing import Optional
 
 from pydantic import Field
 
-from agentex.domain.entities.actions import Action
 from agentex.domain.entities.agents import AgentStatus
 from agentex.utils.logging import make_logger
 from agentex.utils.model_utils import BaseModel
@@ -19,14 +18,13 @@ class CreateAgentRequest(BaseModel):
         ...,
         description="A brief description of the agent."
     )
-    version: str = Field(
+    workflow_name: str = Field(
         ...,
-        description="The version of the agent."
+        description="The name of the workflow that defines the agent."
     )
-    action_service_port: int = Field(
+    workflow_queue_name: str = Field(
         ...,
-        description="The port on which the service will run inside the container. This is the port that the "
-                    "command is pointing at in your Dockerfile. It should be specified in the action manifest."
+        description="The name of the queue to send tasks to."
     )
 
 
@@ -42,22 +40,6 @@ class AgentModel(BaseModel):
     description: str = Field(
         ...,
         description="The description of the action."
-    )
-    version: str = Field(
-        ...,
-        description="The version of the action."
-    )
-    model: Optional[str] = Field(
-        None,
-        description="The LLM model powering the agent."
-    )
-    instructions: Optional[str] = Field(
-        None,
-        description="The instructions for the agent."
-    )
-    actions: Optional[List[Action]] = Field(
-        default=None,
-        description="The actions that the agent can perform."
     )
     status: AgentStatus = Field(
         AgentStatus.UNKNOWN,

@@ -9,18 +9,13 @@ from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from agentex.adapters.containers.build_adapter_kaniko import KanikoBuildGateway
 from agentex.adapters.http.adapter_httpx import HttpxGateway
 from agentex.adapters.kubernetes.adapter_kubernetes import KubernetesGateway
-from agentex.adapters.kv_store.adapter_redis import RedisRepository
-from agentex.adapters.llm.adapter_litellm import LiteLLMGateway
 from agentex.config.dependencies import GlobalDependencies, database_async_read_write_session_maker
 from agentex.config.environment_variables import EnvironmentVariables
 from agentex.domain.services.agents.agent_repository import AgentRepository
 from agentex.domain.services.agents.agent_service import AgentService
-from agentex.domain.services.agents.agent_state_repository import AgentStateRepository
-from agentex.domain.services.agents.agent_state_service import AgentStateService
-from agentex.domain.workflows.run_agent_task_workflow import AgentTaskWorkflow, AgentTaskActivities
-from agentex.domain.workflows.constants import AGENT_TASK_TASK_QUEUE, BUILD_AGENT_TASK_QUEUE
-from agentex.domain.workflows.create_agent_workflow import CreateAgentActivities, CreateAgentWorkflow
-from agentex.domain.workflows.services.hosted_actions_service import HostedActionsServiceActivities
+from agentex.domain.workflows.activities.build_agent import BuildAgentActivities
+from agentex.domain.workflows.constants import BUILD_AGENT_TASK_QUEUE
+from agentex.domain.workflows.create_agent_workflow import BuildAgentWorkflow
 from agentex.utils.logging import make_logger
 
 logger = make_logger(__name__)
@@ -38,106 +33,14 @@ class HealthStatus:
 class OverallHealthStatus:
 
     def __init__(self):
-        self.agent_task_worker_status = HealthStatus(health=False)
         self.create_agent_worker_status = HealthStatus(health=False)
 
     def get_health(self) -> bool:
-        return all([self.agent_task_worker_status.healthy, self.create_agent_worker_status.healthy])
+        return all([self.create_agent_worker_status.healthy])
 
 
 async def health_check(health_status: OverallHealthStatus):
     return web.json_response(health_status.get_health())
-
-
-async def run_agent_task_worker(
-    temporal_client: TemporalClient,
-    global_dependencies: GlobalDependencies,
-    environment_variables: EnvironmentVariables,
-    health_status: OverallHealthStatus,
-    task_queue=AGENT_TASK_TASK_QUEUE,
-):
-    try:
-        async_read_write_session_maker = database_async_read_write_session_maker(
-            db_async_read_write_engine=global_dependencies.database_async_read_write_engine,
-        )
-        agent_repository = AgentRepository(
-            async_read_write_session_maker=async_read_write_session_maker,
-        )
-        k8s_gateway = KubernetesGateway(
-            http_gateway=HttpxGateway(),
-            environment_variables=environment_variables,
-        )
-        build_gateway = KanikoBuildGateway(
-            kubernetes_gateway=k8s_gateway,
-            environment_variables=environment_variables,
-        )
-        agent_service = AgentService(
-            build_gateway=build_gateway,
-            agent_repository=agent_repository,
-            kubernetes_gateway=k8s_gateway,
-            environment_variables=environment_variables,
-        )
-
-        agent_state_service = AgentStateService(
-            repository=AgentStateRepository(
-                memory_repo=RedisRepository(
-                    environment_variables=environment_variables,
-                )
-            )
-        )
-        llm_gateway = LiteLLMGateway(
-            environment_variables=environment_variables,
-        )
-
-        agent_activities = AgentTaskActivities(
-            agent_service=agent_service,
-            agent_state_service=agent_state_service,
-            llm_gateway=llm_gateway,
-        )
-
-        hosted_actions_service_activities = HostedActionsServiceActivities(
-            agent_service=agent_service,
-            environment_variables=environment_variables,
-        )
-
-        # Run the worker
-        worker = Worker(
-            temporal_client,
-            task_queue=task_queue,
-            activity_executor=ThreadPoolExecutor(
-                max_workers=10,
-            ),
-            workflows=[
-                AgentTaskWorkflow,
-            ],
-            activities=[
-                agent_activities.init_task_state,
-                agent_activities.decide_action,
-                agent_activities.take_action,
-                agent_activities.append_to_task_state,
-                hosted_actions_service_activities.create_hosted_actions_service,
-                hosted_actions_service_activities.create_hosted_actions_deployment,
-                hosted_actions_service_activities.get_hosted_actions_service,
-                hosted_actions_service_activities.get_hosted_actions_deployment,
-                hosted_actions_service_activities.delete_hosted_actions_service,
-                hosted_actions_service_activities.delete_hosted_actions_deployment,
-                hosted_actions_service_activities.call_hosted_actions_service,
-                hosted_actions_service_activities.update_agent_status,
-            ],
-            workflow_runner=UnsandboxedWorkflowRunner(),
-            max_concurrent_activities=environment_variables.TEMPORAL_WORKER_MAX_ACTIVITIES_PER_WORKER,
-            build_id=str(uuid.uuid4()),
-        )
-
-        logger.info(f"Starting workers for task queue: {task_queue}")
-        # Eagerly set the worker status to healthy
-        health_status.agent_task_worker_status.set_healthy(True)
-        logger.info(f"Running workers for task queue: {task_queue}")
-        await worker.run()
-
-    except Exception as e:
-        logger.error(f"Agent task worker encountered an error: {e}")
-        health_status.agent_task_worker_status.set_healthy(False)
 
 
 async def run_create_agent_worker(
@@ -169,12 +72,12 @@ async def run_create_agent_worker(
             environment_variables=environment_variables,
         )
 
-        create_agent_activities = CreateAgentActivities(
+        create_agent_activities = BuildAgentActivities(
             agent_service=agent_service,
             environment_variables=environment_variables,
         )
 
-        hosted_actions_service_activities = HostedActionsServiceActivities(
+        build_agent_activities = BuildAgentActivities(
             agent_service=agent_service,
             environment_variables=environment_variables,
         )
@@ -187,21 +90,20 @@ async def run_create_agent_worker(
                 max_workers=10,
             ),
             workflows=[
-                CreateAgentWorkflow,
+                BuildAgentWorkflow,
             ],
             activities=[
                 create_agent_activities.update_agent,
-                hosted_actions_service_activities.build_hosted_actions_service,
-                hosted_actions_service_activities.get_build_job,
-                hosted_actions_service_activities.delete_build_job,
-                hosted_actions_service_activities.create_hosted_actions_service,
-                hosted_actions_service_activities.create_hosted_actions_deployment,
-                hosted_actions_service_activities.get_hosted_actions_service,
-                hosted_actions_service_activities.get_hosted_actions_deployment,
-                hosted_actions_service_activities.delete_hosted_actions_service,
-                hosted_actions_service_activities.delete_hosted_actions_deployment,
-                hosted_actions_service_activities.call_hosted_actions_service,
-                hosted_actions_service_activities.update_agent_status,
+                build_agent_activities.build_agent_image,
+                build_agent_activities.get_build_job,
+                build_agent_activities.delete_build_job,
+                build_agent_activities.create_agent_service,
+                build_agent_activities.create_agent_deployment,
+                build_agent_activities.get_agent_service,
+                build_agent_activities.get_agent_deployment,
+                build_agent_activities.delete_agent_service,
+                build_agent_activities.delete_agent_deployment,
+                build_agent_activities.update_agent_status,
             ],
             workflow_runner=UnsandboxedWorkflowRunner(),
             max_concurrent_activities=environment_variables.TEMPORAL_WORKER_MAX_ACTIVITIES_PER_WORKER,
@@ -229,12 +131,6 @@ async def run_workers(health_status: OverallHealthStatus):
     client = global_dependencies.temporal_client
 
     await asyncio.gather(
-        run_agent_task_worker(
-            temporal_client=client,
-            global_dependencies=global_dependencies,
-            environment_variables=environment_variables,
-            health_status=health_status
-        ),
         run_create_agent_worker(
             temporal_client=client,
             global_dependencies=global_dependencies,

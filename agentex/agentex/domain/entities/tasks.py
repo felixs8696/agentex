@@ -27,3 +27,8 @@ class Task(BaseModel):
         None,
         title="The reason for the current task status",
     )
+
+
+class AgentTaskWorkflowParams(BaseModel):
+    task: Task
+    require_approval: Optional[bool] = False

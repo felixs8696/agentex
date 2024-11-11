@@ -14,8 +14,6 @@ class PackagingMethod(str, Enum):
 class AgentStatus(str, Enum):
     PENDING = "Pending"
     BUILDING = "Building"
-    IDLE = "Idle"
-    ACTIVE = "Active"
     READY = "Ready"
     FAILED = "Failed"
     UNKNOWN = "Unknown"
@@ -42,27 +40,6 @@ class Agent(BaseModel):
         ...,
         description="The description of the action."
     )
-    version: str = Field(
-        ...,
-        description="The version of the action."
-    )
-    action_service_port: int = Field(
-        ...,
-        description="The port on which the service will run inside the container. This is the port that the "
-                    "command is pointing at in your Dockerfile. It should be specified in the action manifest."
-    )
-    model: Optional[str] = Field(
-        None,
-        description="The LLM model powering the agent."
-    )
-    instructions: Optional[str] = Field(
-        None,
-        description="The instructions for the agent."
-    )
-    actions: Optional[List[Action]] = Field(
-        default=None,
-        description="The actions that the agent can perform."
-    )
     status: AgentStatus = Field(
         AgentStatus.UNKNOWN,
         description="The status of the action, indicating if it's building, ready, failed, etc."
@@ -78,4 +55,12 @@ class Agent(BaseModel):
     build_job_namespace: Optional[str] = Field(
         "default",
         description="The namespace that the build job is running in."
+    )
+    workflow_name: str = Field(
+        ...,
+        description="The name of the workflow that defines the agent."
+    )
+    workflow_queue_name: str = Field(
+        ...,
+        description="The name of the queue to send tasks to."
     )

@@ -82,8 +82,8 @@ migration:
 
 clean-db:
 	@echo "Dropping and recreating the database..."
-	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "DROP DATABASE IF EXISTS agentex;"
-	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app=postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "CREATE DATABASE agentex;"
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex-postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "DROP DATABASE IF EXISTS agentex;"
+	minikube kubectl -- exec -it $(shell kubectl get pods --selector=app.kubernetes.io/name=agentex-postgres -o jsonpath='{.items[0].metadata.name}') -- psql -U postgres -c "CREATE DATABASE agentex;"
 	@echo "Database reset completed."
 
 # Command to test
