@@ -48,7 +48,7 @@ class AgentTaskService:
     async def instruct(self, task_id: str, prompt: str) -> None:
         return await self.async_runtime.send_signal(
             workflow_id=task_id,
-            signal=SignalName.INSTRUCT,
+            signal=SignalName.INSTRUCT.value,
             payload=HumanInstruction(
                 task_id=task_id,
                 prompt=prompt,
@@ -58,7 +58,7 @@ class AgentTaskService:
     async def approve(self, task_id: str) -> None:
         return await self.async_runtime.send_signal(
             workflow_id=task_id,
-            signal=SignalName.APPROVE,
+            signal=SignalName.APPROVE.value,
             payload=None
         )
 

@@ -99,6 +99,7 @@ async def run_create_agent_worker(
                 build_agent_activities.delete_build_job,
                 build_agent_activities.create_agent_service,
                 build_agent_activities.create_agent_deployment,
+                build_agent_activities.create_agent_pod_disruption_budget,
                 build_agent_activities.get_agent_service,
                 build_agent_activities.get_agent_deployment,
                 build_agent_activities.delete_agent_service,

@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import Field
 
 from agentex.adapters.async_runtime.adapter_temporal import TaskStatus
+from agentex.domain.entities.agents import Agent
 from agentex.utils.model_utils import BaseModel
 
 
@@ -31,4 +32,5 @@ class Task(BaseModel):
 
 class AgentTaskWorkflowParams(BaseModel):
     task: Task
+    agent: Agent
     require_approval: Optional[bool] = False

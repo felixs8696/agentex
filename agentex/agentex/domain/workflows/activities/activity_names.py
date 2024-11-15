@@ -7,6 +7,7 @@ class AgentActivity(str, Enum):
     DELETE_BUILD_JOB = "delete_build_job"
     CREATE_AGENT_DEPLOYMENT = "create_agent_deployment"
     CREATE_AGENT_SERVICE = "create_agent_service"
+    CREATE_AGENT_POD_DISRUPTION_BUDGET = "create_agent_pod_disruption_budget"
     GET_AGENT_DEPLOYMENT = "get_agent_deployment"
     GET_AGENT_SERVICE = "get_agent_service"
     CALL_AGENT_SERVICE = "call_agent_service"

@@ -6,7 +6,10 @@ metadata:
 rules:
 - apiGroups: ["apps"]
   resources: ["deployments"]
-  verbs: ["create", "delete", "get", "watch", "list"]
+  verbs: ["create", "delete", "get", "watch", "list", "patch"]
 - apiGroups: [""]
   resources: ["services"]
-  verbs: ["create", "delete", "get", "watch", "list"]
+  verbs: ["create", "delete", "get", "watch", "list", "patch"]
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["create", "delete", "get", "watch", "list", "patch"]

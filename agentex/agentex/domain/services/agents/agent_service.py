@@ -12,6 +12,7 @@ from agentex.domain.entities.job import Job
 from agentex.domain.entities.service import Service
 from agentex.domain.services.agents.agent_repository import DAgentRepository
 from agentex.utils.logging import make_logger
+from agentex.utils.timestamp import timestamp_isoformat
 
 logger = make_logger(__name__)
 
@@ -37,7 +38,8 @@ class AgentService:
         self,
         name: str,
         image: str,
-        replicas: int = 1,
+        replicas: int = 2,  # Set default replicas to 2
+        auto_restart: bool = True,
     ) -> Deployment:
         # Define container
         container = k8s_client.V1Container(
@@ -99,22 +101,32 @@ class AgentService:
                     "app.kubernetes.io/name": name,
                     "app.kubernetes.io/instance": name,
                 },
+                annotations={
+                    "kubectl.kubernetes.io/restartedAt": timestamp_isoformat(),
+                },
                 name=name,
                 namespace=self.agents_namespace,
             ),
             spec=pod_spec,
         )
 
-        # Define deployment spec
+        # Define deployment spec with rolling update strategy
         deployment_spec = k8s_client.V1DeploymentSpec(
             replicas=replicas,
-            selector={
-                "matchLabels": {
+            selector=k8s_client.V1LabelSelector(
+                match_labels={
                     "app.kubernetes.io/name": name,
                     "app.kubernetes.io/instance": name,
                 }
-            },
+            ),
             template=template,
+            strategy=k8s_client.V1DeploymentStrategy(
+                type="RollingUpdate",
+                rolling_update=k8s_client.V1RollingUpdateDeployment(
+                    max_surge=1,
+                    max_unavailable=0,
+                ),
+            ),
         )
 
         # Define deployment
@@ -131,10 +143,18 @@ class AgentService:
             spec=deployment_spec,
         )
 
-        # Create the deployment
-        return await self.k8s.create_deployment(
-            namespace=self.agents_namespace, deployment=deployment
-        )
+        # Create or update the deployment
+        existing_deployment = await self.get_agent_deployment(name)
+        if existing_deployment:
+            # Update the existing deployment
+            return await self.k8s.update_deployment(
+                namespace=self.agents_namespace, deployment=deployment
+            )
+        else:
+            # Create the deployment
+            return await self.k8s.create_deployment(
+                namespace=self.agents_namespace, deployment=deployment
+            )
 
     async def create_agent_service(
         self,
@@ -169,9 +189,53 @@ class AgentService:
             ),
         )
 
-        return await self.k8s.create_service(
-            namespace=self.agents_namespace, service=service
+        # Create or update the service
+        existing_service = await self.get_agent_service(name)
+        if existing_service:
+            # Update the existing service
+            return await self.k8s.update_service(
+                namespace=self.agents_namespace, service=service
+            )
+        else:
+            # Create the service
+            return await self.k8s.create_service(
+                namespace=self.agents_namespace, service=service
+            )
+
+    async def create_agent_pod_disruption_budget(self, name: str) -> None:
+        pdb = k8s_client.V1PodDisruptionBudget(
+            api_version="policy/v1",
+            kind="PodDisruptionBudget",
+            metadata=k8s_client.V1ObjectMeta(
+                name=name,
+                labels={
+                    "app.kubernetes.io/name": name,
+                    "app.kubernetes.io/instance": name,
+                },
+            ),
+            spec=k8s_client.V1PodDisruptionBudgetSpec(
+                min_available=1,
+                selector=k8s_client.V1LabelSelector(
+                    match_labels={
+                        "app.kubernetes.io/name": name,
+                        "app.kubernetes.io/instance": name,
+                    }
+                ),
+            ),
         )
+
+        # Create or update the PDB
+        existing_pdb = await self.k8s.get_pod_disruption_budget(
+            namespace=self.agents_namespace, name=name
+        )
+        if existing_pdb:
+            await self.k8s.update_pod_disruption_budget(
+                namespace=self.agents_namespace, pdb=pdb
+            )
+        else:
+            await self.k8s.create_pod_disruption_budget(
+                namespace=self.agents_namespace, pdb=pdb
+            )
 
     async def get_agent_deployment(self, name: str) -> Optional[Deployment]:
         return await self.k8s.get_deployment(namespace=self.agents_namespace, name=name)

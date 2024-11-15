@@ -1,6 +1,6 @@
 import asyncio
 from datetime import timedelta
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -98,6 +98,13 @@ class BuildAgentActivities:
         name: str
     ) -> Service:
         return await self.agent_service.create_agent_service(name=name)
+
+    @activity.defn(name=AgentActivity.CREATE_AGENT_POD_DISRUPTION_BUDGET)
+    async def create_agent_pod_disruption_budget(
+        self,
+        name: str,
+    ) -> None:
+        await self.agent_service.create_agent_pod_disruption_budget(name=name)
 
     @activity.defn(name=AgentActivity.GET_AGENT_DEPLOYMENT)
     async def get_agent_deployment(
@@ -316,6 +323,15 @@ async def create_agent_service(name: str) -> Service:
     return service
 
 
+async def create_agent_pod_disruption_budget(name: str):
+    await execute_workflow_activity(
+        activity_name=AgentActivity.CREATE_AGENT_POD_DISRUPTION_BUDGET,
+        arg=name,
+        start_to_close_timeout=timedelta(seconds=10),
+        retry_policy=RetryPolicy(maximum_attempts=0),
+    )
+
+
 async def start_agent_server(agent: Agent) -> AgentServer:
     # Create the agent deployment and service to fetch the agent spec
     server_name = f"{agent.name}".replace(".", "-").replace("_", "-")
@@ -335,6 +351,8 @@ async def start_agent_server(agent: Agent) -> AgentServer:
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
         raise error
+
+    await create_agent_pod_disruption_budget(name=server_name)
 
     return AgentServer(
         service_name=service.name,

@@ -2,7 +2,7 @@ from typing import Annotated, Optional, Dict
 
 from fastapi import Depends
 from kubernetes_asyncio import client
-from kubernetes_asyncio.client import V1Job, ApiClient, ApiException, V1Deployment, V1Service
+from kubernetes_asyncio.client import V1Job, ApiClient, ApiException, V1Deployment, V1Service, V1PodDisruptionBudget
 
 from agentex.adapters.http.adapter_httpx import DHttpxGateway
 from agentex.adapters.kubernetes.port import KubernetesPort
@@ -91,6 +91,19 @@ class KubernetesGateway(KubernetesPort):
                     return v1_deployment
             raise KubernetesError(f"Error creating deployment {deployment.metadata.name}: {error}") from error
 
+    async def update_deployment(self, namespace: str, deployment: V1Deployment) -> Deployment:
+        try:
+            async with ApiClient() as api:
+                apps_v1 = client.AppsV1Api(api)
+                v1_deployment = await apps_v1.patch_namespaced_deployment(
+                    name=deployment.metadata.name,
+                    namespace=namespace,
+                    body=deployment
+                )
+            return self._convert_deploy_to_entity(v1_deployment)
+        except ApiException as error:
+            raise KubernetesError(f"Error updating deployment {deployment.metadata.name}: {error}") from error
+
     async def get_deployment(self, namespace: str, name: str) -> Optional[Deployment]:
         try:
             async with ApiClient() as api:
@@ -134,6 +147,19 @@ class KubernetesGateway(KubernetesPort):
                     return v1_service
             raise KubernetesError(f"Error creating service {service.metadata.name}: {error}") from error
 
+    async def update_service(self, namespace: str, service: V1Service) -> Service:
+        try:
+            async with ApiClient() as api:
+                core_v1 = client.CoreV1Api(api)
+                v1_service = await core_v1.patch_namespaced_service(
+                    name=service.metadata.name,
+                    namespace=namespace,
+                    body=service
+                )
+            return self._convert_service_to_entity(v1_service)
+        except ApiException as error:
+            raise KubernetesError(f"Error updating service {service.metadata.name}: {error}") from error
+
     async def get_service(self, namespace: str, name: str) -> Optional[Service]:
         try:
             async with ApiClient() as api:
@@ -153,6 +179,54 @@ class KubernetesGateway(KubernetesPort):
                 await core_v1.delete_namespaced_service(name=name, namespace=namespace)
             except ApiException as error:
                 raise KubernetesError(f"Error deleting service {name}: {error}") from error
+
+    @staticmethod
+    async def create_pod_disruption_budget(namespace: str, pdb: V1PodDisruptionBudget) -> None:
+        async with ApiClient() as api:
+            policy_v1 = client.PolicyV1Api(api)
+            try:
+                await policy_v1.create_namespaced_pod_disruption_budget(
+                    namespace=namespace,
+                    body=pdb
+                )
+            except ApiException as error:
+                raise KubernetesError(f"Error creating pod disruption budget {pdb.metadata.name}: {error}") from error
+
+    @staticmethod
+    async def get_pod_disruption_budget(namespace: str, name: str) -> Optional[V1PodDisruptionBudget]:
+        async with ApiClient() as api:
+            policy_v1 = client.PolicyV1Api(api)
+            try:
+                return await policy_v1.read_namespaced_pod_disruption_budget(name=name, namespace=namespace)
+            except ApiException as error:
+                if error.status == 404:
+                    return None
+                raise KubernetesError(f"Error getting pod disruption budget {name}: {error}") from error
+
+    @staticmethod
+    async def update_pod_disruption_budget(namespace: str, pdb: V1PodDisruptionBudget) -> None:
+        async with ApiClient() as api:
+            policy_v1 = client.PolicyV1Api(api)
+            try:
+                await policy_v1.patch_namespaced_pod_disruption_budget(
+                    name=pdb.metadata.name,
+                    namespace=namespace,
+                    body=pdb
+                )
+            except ApiException as error:
+                raise KubernetesError(f"Error updating pod disruption budget {pdb.metadata.name}: {error}") from error
+
+    @staticmethod
+    async def delete_pod_disruption_budget(namespace: str, name: str) -> None:
+        async with ApiClient() as api:
+            policy_v1 = client.PolicyV1Api(api)
+            try:
+                await policy_v1.delete_namespaced_pod_disruption_budget(
+                    name=name,
+                    namespace=namespace
+                )
+            except ApiException as error:
+                raise KubernetesError(f"Error deleting pod disruption budget {name}: {error}") from error
 
     async def call_service(
         self,
